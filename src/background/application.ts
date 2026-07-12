@@ -23,6 +23,7 @@ import {
 import { CaptureService } from "./capture";
 import { database } from "../storage/database";
 import { normalizeUrl } from "../domain/url";
+import { parseImportedUrls } from "../domain/import";
 
 const items = new DexieReadingRepository();
 const proposals = new DexieProposalRepository();
@@ -35,45 +36,6 @@ export const capture = new CaptureService(items, settings);
 const confirming = new Set<string>();
 
 const escapeCsv = (value: string | number): string => `"${String(value).replaceAll('"', '""')}"`;
-
-const parseImportedUrls = (
-  format: "csv" | "html" | "markdown" | "urls",
-  text: string
-): Array<{ url: string; title?: string }> => {
-  if (format === "html") {
-    return [...text.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/giu)].map((match) => ({
-      url: match[1],
-      title: match[2].replace(/<[^>]+>/g, "").trim() || undefined
-    }));
-  }
-  if (format === "markdown") {
-    const linked = [...text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/gu)].map((match) => ({
-      title: match[1],
-      url: match[2]
-    }));
-    if (linked.length > 0) return linked;
-  }
-  if (format === "csv") {
-    return text
-      .split(/\r?\n/u)
-      .slice(1)
-      .map(
-        (line) =>
-          line
-            .match(/(?:^|,)(?:"((?:[^"]|"")*)"|([^,]*))/gu)
-            ?.map((cell) => cell.replace(/^,?"?|"?$/g, "").replaceAll('""', '"')) ?? []
-      )
-      .map((cells) => ({
-        title: cells[0],
-        url: cells.find((cell) => /^https?:\/\//iu.test(cell)) ?? ""
-      }))
-      .filter((entry) => entry.url);
-  }
-  return text
-    .split(/\s+/u)
-    .filter((part) => /^https?:\/\//iu.test(part))
-    .map((url) => ({ url: url.replace(/[),.;]+$/u, "") }));
-};
 
 const deterministicEventId = async (id: string): Promise<string> => {
   const bytes = new Uint8Array(

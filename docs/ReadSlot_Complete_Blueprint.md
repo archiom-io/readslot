@@ -1,5 +1,7 @@
 # ReadSlot — Complete Product, Engineering, Delivery, and Open-Source Blueprint
 
+This is ReadSlot's canonical product and engineering specification.
+
 **Document status:** Implemented beta baseline; OAuth verification pending  
 **Version:** 2.1  
 **Project type:** Free, local-first Chrome extension  

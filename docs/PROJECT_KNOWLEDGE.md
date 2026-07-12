@@ -12,7 +12,7 @@
 - **Product type:** Free, local-first Chrome/Chromium extension
 - **License direction:** MIT
 - **Upstream foundation:** Reading Block by Zara Zhang (`zarazhangrui/reading-block`), MIT licensed
-- **Canonical specification:** `ReadSlot_Complete_Blueprint.md`
+- **Canonical specification:** [`ReadSlot_Complete_Blueprint.md`](ReadSlot_Complete_Blueprint.md)
 
 Use **ReadSlot** in product copy, UI labels, package metadata, documentation, OAuth configuration, and store listings. Use **Reading Block** only when referring to the upstream project or preserving its legal attribution.
 

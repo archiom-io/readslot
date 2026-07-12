@@ -1,6 +1,7 @@
 # ReadSlot Development Guide
 
-Read `PROJECT_KNOWLEDGE.md` and the relevant section of `ReadSlot_Complete_Blueprint.md` before changing the project.
+Read `docs/PROJECT_KNOWLEDGE.md` and the relevant section of
+`docs/ReadSlot_Complete_Blueprint.md` before changing the project.
 
 ## Current state
 
@@ -32,5 +33,5 @@ client IDs. Do not add placeholder credentials to tracked files or weaken releas
 - Preserve upstream MIT license and notices if code is imported.
 - Add or update tests with behavior changes.
 - Record material architectural decisions under `docs/adr/` once that directory exists.
-- Update `PROJECT_KNOWLEDGE.md` when a settled decision changes the project baseline.
+- Update `docs/PROJECT_KNOWLEDGE.md` when a settled decision changes the project baseline.
 - Update the blueprint when product requirements or acceptance criteria change.

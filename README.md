@@ -22,6 +22,11 @@ Load `dist/` from `chrome://extensions` with Developer mode enabled. Calendar fe
 disabled until `READSLOT_GOOGLE_OAUTH_CLIENT_ID` is supplied during the build; see
 [`docs/oauth.md`](docs/oauth.md).
 
+The maintained development baseline is in
+[`docs/PROJECT_KNOWLEDGE.md`](docs/PROJECT_KNOWLEDGE.md), with the complete product and delivery
+specification in
+[`docs/ReadSlot_Complete_Blueprint.md`](docs/ReadSlot_Complete_Blueprint.md).
+
 ## Privacy and permissions
 
 ReadSlot has no backend, advertising, analytics, or remote executable code. See
