@@ -35,7 +35,7 @@ Use:
 - IndexedDB for the reading queue
 - Vitest for unit tests
 - Playwright for browser tests
-- GitHub Actions for CI
+- Local verification before every push
 - GitHub Projects for sprint planning
 
 No paid AI API is required.
@@ -1276,12 +1276,12 @@ Responsibilities:
 - lint-staged optional
 - Commitlint optional
 
-## CI
+## Quality automation
 
-- GitHub Actions
-- CodeQL
-- Dependabot
+- Local `pnpm check` and Playwright verification before every push
+- Dependabot for npm dependency visibility
 - npm audit as advisory, not sole security gate
+- GitHub Actions and CodeQL may be restored later through an ADR
 
 ---
 
@@ -1296,11 +1296,6 @@ readslot/
 │   │   ├── security.yml
 │   │   └── config.yml
 │   ├── PULL_REQUEST_TEMPLATE.md
-│   ├── workflows/
-│   │   ├── ci.yml
-│   │   ├── codeql.yml
-│   │   ├── release.yml
-│   │   └── webstore-publish.yml
 │   ├── CODEOWNERS
 │   └── dependabot.yml
 ├── docs/
@@ -1606,21 +1601,20 @@ Threats:
 - Insecure logging
 - Overbroad permissions
 - Rogue contributor
-- Compromised GitHub Actions secret
+- Compromised release credential or maintainer account
 - Malicious release artifact
 
 Mitigations:
 - Sanitize all external text.
 - Never use `innerHTML` for metadata.
 - Enforce strict CSP.
-- Pin GitHub Actions to trusted versions or commit SHAs.
 - Use dependency review.
 - Require PR reviews for release files.
 - Protect main branch.
 - Use reproducible builds where possible.
 - Create checksums for releases.
 - Maintain security policy.
-- Run CodeQL.
+- Run local lint, type, test, audit, secret, and package checks before release.
 - Keep dependencies minimal.
 
 ## 15.5 Sensitive URLs
@@ -1712,7 +1706,7 @@ type Result<T, E> =
 ## 16.8 Formatting
 
 - Prettier is authoritative.
-- ESLint must pass with zero warnings in CI.
+- ESLint must pass locally with zero warnings before every push.
 - Import order is automated.
 - Use LF line endings.
 - UTF-8 files.
@@ -1862,7 +1856,7 @@ Every PR must:
 - Include tests
 - Include screenshots for UI changes
 - Note permission or privacy impact
-- Pass CI
+- Pass the documented local quality gates
 - Avoid unrelated refactors
 
 ## 18.4 Branch protection
@@ -1878,7 +1872,7 @@ Require:
 - CODEOWNERS review for:
   - Manifest
   - OAuth
-  - Release workflow
+  - Release scripts
   - Privacy policy
   - Security-sensitive code
 
@@ -2107,16 +2101,16 @@ Issues:
 2. Preserve license and attribution.
 3. Add README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT.
 4. Configure TypeScript, Vite, React, ESLint, Prettier.
-5. Configure GitHub Actions.
+5. Configure local quality-gate scripts.
 6. Configure issue forms and PR template.
 7. Add architecture decision records.
-8. Add CodeQL and Dependabot.
+8. Add npm Dependabot and document local security checks.
 9. Create initial Chrome Manifest V3 shell.
 10. Document AI-assisted coding rules.
 
 Exit criteria:
 - Empty extension builds and loads.
-- CI passes.
+- Local quality gates pass.
 - Governance files exist.
 - First tagged development release created.
 
@@ -2603,7 +2597,7 @@ Disclose:
 
 1. Update version.
 2. Update changelog.
-3. Run full CI.
+3. Run the full local quality gate.
 4. Run manual OAuth test.
 5. Run permission diff.
 6. Build production package.
@@ -2655,7 +2649,7 @@ Open source does not mean every operational asset is public.
 
 Keep private:
 - Chrome Web Store API credentials
-- CI publishing secrets
+- Future release-automation credentials
 - OAuth verification correspondence
 - Private signing keys
 - Personal test calendars
@@ -2741,11 +2735,11 @@ README sections:
 
 ---
 
-# 25. CI/CD Specification
+# 25. Local Verification and Release Specification
 
-## Pull request CI
+GitHub Actions are intentionally disabled during the current development phase. Before every
+push, run:
 
-Run:
 - Install with lockfile
 - Type check
 - Lint
@@ -2757,25 +2751,17 @@ Run:
 - Permission diff
 - Secret scan
 - Dependency review
-
-## Main branch CI
-
-Additionally:
 - E2E tests
-- CodeQL
-- Build release artifact
-- Upload artifact for manual testing
 
-## Release workflow
+## Manual release workflow
 
-On version tag:
+Before creating a version tag:
 - Verify tag matches manifest
 - Build production zip
 - Generate SHA-256 checksum
-- Create GitHub release
-- Attach artifact
-- Optional manual approval for Chrome Web Store upload
-- Never auto-publish without maintainer approval initially
+- Inspect the artifact and run the manual browser/OAuth checklist
+- Create the GitHub release and attach artifacts manually if desired
+- Never publish to the Chrome Web Store without maintainer approval
 
 ---
 

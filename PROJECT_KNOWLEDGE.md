@@ -29,7 +29,7 @@ Core promise:
 ## 3. Current repository state
 
 This repository now contains the ReadSlot Manifest V3 application, its domain/storage/Calendar
-adapters, React queue/planner/session/settings surfaces, unit/property/E2E tests, CI workflows,
+adapters, React queue/planner/session/settings surfaces, unit/property/E2E tests, local quality gates,
 store assets, release scripts, and project documentation. `ReadSlot_Complete_Blueprint.md` remains
 the full product specification; this file records the implemented baseline.
 
@@ -130,7 +130,8 @@ The implementation uses:
 - Vitest, Testing Library, fake IndexedDB, and fast-check
 - Playwright with mocked Chrome/Calendar boundaries for end-to-end tests
 - ESLint and Prettier
-- GitHub Actions, CodeQL, and Dependabot
+- Local `pnpm check` and Playwright verification before every push
+- Dependabot for npm dependency updates; GitHub Actions are intentionally disabled for now
 
 React reducer/local component state is used instead of Zustand. Vite builds the background and
 extension pages as ES modules plus a separate isolated IIFE content bundle. Any new dependency
@@ -210,7 +211,7 @@ Start with Sprint 0 in the blueprint. A practical first delivery chain is:
 
 1. Decide whether to fork/import upstream code or bootstrap cleanly while preserving MIT attribution.
 2. Add license and attribution files before importing upstream code.
-3. Bootstrap TypeScript, Vite, React, Manifest V3, formatting, tests, and CI.
+3. Bootstrap TypeScript, Vite, React, Manifest V3, formatting, tests, and local quality gates.
 4. Define domain types and runtime schemas without UI dependencies.
 5. Implement storage adapters and migrations.
 6. Implement capture, URL normalization, and duplicate detection.
