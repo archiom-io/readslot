@@ -1,7 +1,7 @@
 # Release
 
 1. Set the intended Semantic Version in `package.json` and update `CHANGELOG.md`.
-2. Provide the production Chrome Extension OAuth client ID in the environment.
+2. Provide the production Chrome Extension OAuth client ID in the environment, and create it against the Chrome Web Store extension ID for the release build.
 3. Run `pnpm check`, `pnpm test:e2e`, and `pnpm package`.
 4. Inspect `release/readslot-VERSION.zip`; the manifest must be at its root.
 5. Verify the adjacent SHA-256 file and ensure no source maps, `.env`, tests, or credentials exist.

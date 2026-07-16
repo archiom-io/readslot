@@ -14,13 +14,14 @@ Requirements: Node 24 and pnpm 11.
 
 ```sh
 pnpm install
-pnpm build
+READSLOT_GOOGLE_OAUTH_CLIENT_ID=578077198252-8a2knumc5t19autrgprq1g2fi0sdvu11.apps.googleusercontent.com pnpm build
 pnpm check
 ```
 
 Load `dist/` from `chrome://extensions` with Developer mode enabled. Calendar features are
 disabled until `READSLOT_GOOGLE_OAUTH_CLIENT_ID` is supplied during the build; see
-[`docs/oauth.md`](docs/oauth.md).
+[`docs/oauth.md`](docs/oauth.md). The current development OAuth client is tied to the extension ID
+`lbmgjokmljcgnhalhkbdfmomifkcedmp`.
 
 The maintained development baseline is in
 [`docs/PROJECT_KNOWLEDGE.md`](docs/PROJECT_KNOWLEDGE.md), with the complete product and delivery
