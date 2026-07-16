@@ -10,6 +10,13 @@ const chromeMock = (configured = true) => ({
   identity: {
     getAuthToken: vi.fn(async () => ({ token: "test-auth-value" })),
     removeCachedAuthToken: vi.fn(async () => undefined)
+  },
+  storage: {
+    local: {
+      get: vi.fn(async () => ({})),
+      set: vi.fn(async () => undefined),
+      remove: vi.fn(async () => undefined)
+    }
   }
 });
 
@@ -77,6 +84,43 @@ describe("GoogleCalendarGateway", () => {
     expect(mockedChrome.identity.removeCachedAuthToken).toHaveBeenCalledWith({
       token: "test-auth-value"
     });
+    expect(mockedChrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("keeps an explicit disconnect from silently reconnecting", async () => {
+    const mockedChrome = chromeMock();
+    vi.mocked(mockedChrome.storage.local.get).mockResolvedValue({
+      "readslot.googleCalendarDisconnected": true
+    });
+    vi.stubGlobal("chrome", mockedChrome);
+    const gateway = new GoogleCalendarGateway();
+
+    const result = await gateway.connect(false);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "OAUTH_DISCONNECTED",
+        message: "Google Calendar is disconnected. Connect to continue."
+      }
+    });
+    expect(mockedChrome.identity.getAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("remembers disconnect and clears that choice after an interactive reconnect", async () => {
+    const mockedChrome = chromeMock();
+    vi.stubGlobal("chrome", mockedChrome);
+    const gateway = new GoogleCalendarGateway();
+
+    expect((await gateway.disconnect()).ok).toBe(true);
+    expect(mockedChrome.storage.local.set).toHaveBeenCalledWith({
+      "readslot.googleCalendarDisconnected": true
+    });
+
+    expect((await gateway.connect(true)).ok).toBe(true);
+    expect(mockedChrome.storage.local.remove).toHaveBeenCalledWith(
+      "readslot.googleCalendarDisconnected"
+    );
   });
 
   it("sends the caller-provided deterministic event ID", async () => {

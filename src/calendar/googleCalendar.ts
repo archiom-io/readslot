@@ -11,12 +11,23 @@ interface TokenState {
 }
 
 const API_ROOT = "https://www.googleapis.com/calendar/v3";
+const DISCONNECTED_KEY = "readslot.googleCalendarDisconnected";
 
 export class GoogleCalendarGateway implements CalendarGateway {
   private tokenState?: TokenState;
 
   isConfigured(): boolean {
     return Boolean(chrome.runtime.getManifest().oauth2?.client_id);
+  }
+
+  private async isExplicitlyDisconnected(): Promise<boolean> {
+    const stored = await chrome.storage.local.get(DISCONNECTED_KEY);
+    return stored[DISCONNECTED_KEY] === true;
+  }
+
+  private async clearCachedToken(token?: string): Promise<void> {
+    if (token) await chrome.identity.removeCachedAuthToken({ token }).catch(() => undefined);
+    this.tokenState = undefined;
   }
 
   async connect(interactive: boolean): Promise<Result<void>> {
@@ -26,11 +37,18 @@ export class GoogleCalendarGateway implements CalendarGateway {
         message: "Google Calendar is not configured for this build."
       });
     }
+    if (!interactive && (await this.isExplicitlyDisconnected())) {
+      return err({
+        code: "OAUTH_DISCONNECTED",
+        message: "Google Calendar is disconnected. Connect to continue."
+      });
+    }
     try {
       const response = await chrome.identity.getAuthToken({ interactive });
       if (!response.token)
         return err({ code: "OAUTH_DENIED", message: "Google sign-in was cancelled or denied." });
       this.tokenState = { token: response.token };
+      if (interactive) await chrome.storage.local.remove(DISCONNECTED_KEY);
       return ok(undefined);
     } catch {
       return err({ code: "OAUTH_DENIED", message: "Google sign-in was cancelled or denied." });
@@ -42,9 +60,16 @@ export class GoogleCalendarGateway implements CalendarGateway {
       .getAuthToken({ interactive: false })
       .catch(() => undefined);
     const token = this.tokenState?.token ?? cached?.token;
-    if (token) await chrome.identity.removeCachedAuthToken({ token }).catch(() => undefined);
-    this.tokenState = undefined;
-    return ok(undefined);
+    await this.clearCachedToken(token);
+    try {
+      await chrome.storage.local.set({ [DISCONNECTED_KEY]: true });
+      return ok(undefined);
+    } catch {
+      return err({
+        code: "STORAGE_ERROR",
+        message: "Google access was cleared, but ReadSlot could not save the disconnected state."
+      });
+    }
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<Result<T>> {
@@ -62,7 +87,7 @@ export class GoogleCalendarGateway implements CalendarGateway {
         headers
       });
       if (response.status === 401) {
-        await this.disconnect();
+        await this.clearCachedToken(this.tokenState.token);
         return err({
           code: "OAUTH_REVOKED",
           message: "Google Calendar access expired. Reconnect to continue."

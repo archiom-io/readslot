@@ -53,11 +53,11 @@ const App = () => {
     if (result.ok) {
       setNotice({
         tone: "success",
-        text: "Google Calendar disconnected. Your local queue is unchanged."
+        text: "Disconnected from Google Calendar. Saved queue items remain on this device."
       });
       setCalendars([]);
       await load();
-    }
+    } else setNotice({ tone: "danger", text: result.error.message });
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
