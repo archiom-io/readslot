@@ -8,9 +8,9 @@ const installChromeMock = async (page: Page) => {
       const item = {
         schemaVersion: 1,
         id: "item-1",
-        originalUrl: "https://example.com/local-first-reading",
-        canonicalUrl: "https://example.com/local-first-reading",
-        title: "A practical guide to local-first software",
+        originalUrl: "https://example.com/focused-reading",
+        canonicalUrl: "https://example.com/focused-reading",
+        title: "A practical guide to focused reading",
         domain: "example.com",
         contentType: "article",
         estimatedMinutes: 30,
@@ -27,7 +27,7 @@ const installChromeMock = async (page: Page) => {
         itemIds: [item.id],
         calendarId: "primary",
         title: "ReadSlot — 1 item",
-        description: "1. A practical guide to local-first software",
+        description: "1. A practical guide to focused reading",
         suggestedStart: "2026-07-15T12:00:00.000Z",
         suggestedEnd: "2026-07-15T12:30:00.000Z",
         durationMinutes: 30,
@@ -64,6 +64,32 @@ const installChromeMock = async (page: Page) => {
         updatedAt: now,
         lastSyncedAt: now
       };
+      const settings = {
+        schemaVersion: 1,
+        readingSpeedWpm: 220,
+        defaultUnknownMinutes: 15,
+        allowedWeekdays: [1, 2, 3, 4, 5],
+        earliestStart: "18:00",
+        latestEnd: "21:00",
+        minimumBlockMinutes: 15,
+        preferredBlockMinutes: 30,
+        maximumBlockMinutes: 90,
+        planningHorizonDays: 14,
+        minimumNoticeMinutes: 60,
+        bufferBeforeMinutes: 10,
+        bufferAfterMinutes: 10,
+        maximumBlocksPerDay: 1,
+        availabilityCalendarIds: ["primary"],
+        destinationCalendarId: "primary",
+        timezone: "UTC",
+        defaultReminderMinutes: 10,
+        allowConflicts: false,
+        ignoreAllDayEvents: false,
+        respectDeclinedEvents: true,
+        treatTentativeAsBusy: true,
+        weeklyPlanningNotification: false,
+        privacyMode: false
+      };
       const testState: { reviewPayload?: unknown } = {};
       Object.defineProperty(window, "__readslotE2E", { value: testState, configurable: true });
       const successful = (value: unknown) => ({ ok: true, value });
@@ -86,6 +112,16 @@ const installChromeMock = async (page: Page) => {
               return successful([proposal]);
             if (message.type === "calendar.status")
               return successful({ configured: true, connected: true });
+            if (message.type === "calendar.list")
+              return successful([
+                {
+                  id: "primary",
+                  summary: "Primary calendar",
+                  primary: true,
+                  accessRole: "owner"
+                }
+              ]);
+            if (message.type === "settings.get") return successful(settings);
             if (message.type === "weekly.plan")
               return successful([
                 {
@@ -119,7 +155,7 @@ test("queue renders local reading data and primary actions", async ({ page }) =>
   await page.goto("/queue.html");
   await expect(page.getByRole("heading", { name: "Make later happen." })).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "A practical guide to local-first software" })
+    page.getByRole("link", { name: "A practical guide to focused reading" })
   ).toBeVisible();
   await expect(page.getByText("30 min").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Plan reading time" })).toBeVisible();
@@ -138,6 +174,7 @@ test("planner keeps event creation behind explicit confirmation", async ({ page 
   await expect(
     page.getByText("Reading block created. Your items are now scheduled.")
   ).toBeVisible();
+  await page.screenshot({ path: "store-assets/screenshots/calendar-confirmed.png" });
 });
 
 test("toolbar popup previews first and saves only after an explicit action", async ({ page }) => {
@@ -215,9 +252,11 @@ test("session review completes one item and returns an unfinished item to the qu
 }) => {
   await installChromeMock(page);
   await page.goto("/session.html");
+  await expect(page.getByRole("heading", { name: "Read with intention." })).toBeVisible();
+  await page.screenshot({ path: "store-assets/screenshots/session-review.png" });
 
   await page
-    .getByLabel("Outcome for A practical guide to local-first software")
+    .getByLabel("Outcome for A practical guide to focused reading")
     .selectOption("completed");
   await page.getByRole("button", { name: "Finish review" }).click();
 
@@ -236,4 +275,15 @@ test("session review completes one item and returns an unfinished item to the qu
     completedItemIds: ["item-1"],
     skippedItemIds: []
   });
+});
+
+test("settings explains connected Calendar access and local controls", async ({ page }) => {
+  await installChromeMock(page);
+  await page.goto("/options.html");
+
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Google Calendar" })).toBeVisible();
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Disconnect and revoke access" })).toBeVisible();
+  await page.screenshot({ path: "store-assets/screenshots/settings.png" });
 });

@@ -8,7 +8,8 @@ For the current development setup, use the Chrome extension ID `lbmgjokmljcgnhal
 2. Configure the OAuth consent screen and development test users.
 3. Load the development build and copy its Chrome extension ID.
 4. Create a Chrome Extension OAuth client associated with that ID.
-5. Build with `READSLOT_GOOGLE_OAUTH_CLIENT_ID=578077198252-8a2knumc5t19autrgprq1g2fi0sdvu11.apps.googleusercontent.com`.
+5. Copy `.env.example` to the ignored `.env.local` file and run `pnpm build`. Normal local
+   builds load the development client automatically.
 6. Reload `dist/` and use Settings → Connect Google.
 
 Requested scopes:
@@ -22,7 +23,8 @@ browser settings. **Disconnect and revoke access** sends the current access toke
 Google's OAuth revocation endpoint, then removes it from Chrome's token cache. If Google cannot be
 reached, ReadSlot still disconnects locally and directs the user to Google Account connections to
 finish revocation. Production requires a separate OAuth client associated with the Chrome Web Store
-extension ID.
+extension ID. Release builds do not load the development `.env.local` automatically; provide the
+production Store client ID explicitly.
 
 The deployable public homepage, privacy policy, terms, support page, paste-ready scope
 justifications, verification video script, and production submission walkthrough are maintained in

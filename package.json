@@ -1,7 +1,7 @@
 {
   "name": "readslot",
   "version": "0.9.0",
-  "description": "Local-first reading queue and user-confirmed Google Calendar scheduler.",
+  "description": "Private reading queue and user-confirmed Google Calendar scheduler.",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "vite build --watch --mode development",
-    "build": "vite build && vite build --config vite.content.config.ts && node scripts/generate-manifest.mjs",
+    "build": "vite build && vite build --config vite.content.config.ts && node --env-file-if-exists=.env.local scripts/generate-manifest.mjs",
     "build:release": "vite build --mode production && vite build --config vite.content.config.ts --mode production && node scripts/generate-manifest.mjs --release && node scripts/validate-manifest.mjs --release",
     "package": "pnpm build:release && node scripts/package-release.mjs",
     "validate:manifest": "node scripts/validate-manifest.mjs",

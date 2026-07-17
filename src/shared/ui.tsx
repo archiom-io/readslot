@@ -24,9 +24,7 @@ export const PageShell = ({
   <div className="app-shell">
     <header className="topbar">
       <a className="brand" href={extensionUrl("queue.html")} aria-label="ReadSlot home">
-        <span className="brand-mark" aria-hidden="true">
-          R
-        </span>
+        <img className="brand-mark" src="icons/readslot.svg" alt="" aria-hidden="true" />
         <span>ReadSlot</span>
       </a>
       <nav aria-label="Primary navigation">
@@ -46,7 +44,9 @@ export const PageShell = ({
       </section>
       {children}
     </main>
-    <footer>Local-first · No tracking · Calendar actions always require confirmation</footer>
+    <footer>
+      Stored on this device · No tracking · Calendar actions always require confirmation
+    </footer>
   </div>
 );
 

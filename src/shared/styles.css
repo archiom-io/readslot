@@ -76,12 +76,10 @@ a {
 .brand-mark {
   width: 34px;
   height: 34px;
-  display: grid;
-  place-items: center;
   border-radius: 10px;
-  color: white;
-  background: linear-gradient(145deg, #7057f5, #3b2e88);
-  box-shadow: 0 7px 18px #4f3ec44d;
+  display: block;
+  object-fit: cover;
+  box-shadow: 0 4px 10px #4f3ec438;
 }
 nav {
   display: flex;

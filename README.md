@@ -4,7 +4,7 @@
 
 Save useful content, find realistic time, and confirm reading blocks in Google Calendar.
 
-ReadSlot is a free, local-first Manifest V3 extension. Saved links, notes, estimates, and
+ReadSlot is a free, privacy-focused Manifest V3 extension. Saved links, notes, estimates, and
 reading history stay in the browser. ReadSlot reads Calendar availability only after the user
 connects Google, and it never creates an event without explicit confirmation.
 
@@ -14,13 +14,18 @@ Requirements: Node 24 and pnpm 11.
 
 ```sh
 pnpm install
-READSLOT_GOOGLE_OAUTH_CLIENT_ID=578077198252-8a2knumc5t19autrgprq1g2fi0sdvu11.apps.googleusercontent.com pnpm build
+cp .env.example .env.local
+pnpm build
 pnpm check
 ```
 
+To use the pinned toolchain without changing host Node or pnpm versions, follow the
+[`Docker development guide`](docs/docker.md).
+
 Load `dist/` from `chrome://extensions` with Developer mode enabled. Calendar features are
-disabled until `READSLOT_GOOGLE_OAUTH_CLIENT_ID` is supplied during the build; see
-[`docs/oauth.md`](docs/oauth.md). The current development OAuth client is tied to the extension ID
+configured from the ignored `.env.local` file during normal development builds; see
+[`docs/oauth.md`](docs/oauth.md). Release builds still require the production client ID to be
+supplied explicitly. The current development OAuth client is tied to the extension ID
 `lbmgjokmljcgnhalhkbdfmomifkcedmp`.
 
 The maintained development baseline is in

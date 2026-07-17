@@ -1,6 +1,8 @@
 # Troubleshooting
 
-- **Calendar is not configured:** rebuild with `READSLOT_GOOGLE_OAUTH_CLIENT_ID=578077198252-8a2knumc5t19autrgprq1g2fi0sdvu11.apps.googleusercontent.com`.
+- **Calendar is not configured:** confirm `.env.local` contains the development
+  `READSLOT_GOOGLE_OAUTH_CLIENT_ID`, run `pnpm build`, and reload the extension from
+  `chrome://extensions`.
 - **Sign-in is denied:** confirm the OAuth client uses the current extension ID `lbmgjokmljcgnhalhkbdfmomifkcedmp` and the account is a test user.
 - **Google access could not be revoked:** ReadSlot still disconnects locally. Remove ReadSlot from [Google Account connections](https://myaccount.google.com/connections), then retry connecting only when needed.
 - **Calendar is read-only:** select a calendar with writer or owner access.

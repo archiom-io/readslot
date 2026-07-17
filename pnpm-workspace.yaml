@@ -1,0 +1,3 @@
+allowBuilds:
+  # MSW is an optional Vitest dependency; ReadSlot does not use its generated worker asset.
+  msw: false

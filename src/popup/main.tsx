@@ -110,9 +110,7 @@ export const PopupApp = () => {
   return (
     <main className="popup-shell">
       <header className="popup-brand">
-        <span className="brand-mark" aria-hidden="true">
-          R
-        </span>
+        <img className="brand-mark" src="icons/readslot.svg" alt="" aria-hidden="true" />
         <span>ReadSlot</span>
       </header>
 

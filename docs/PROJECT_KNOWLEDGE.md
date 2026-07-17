@@ -132,6 +132,7 @@ The implementation uses:
 - Playwright with mocked Chrome/Calendar boundaries for end-to-end tests
 - ESLint and Prettier
 - Local `pnpm check` and Playwright verification before every push
+- Optional Docker tooling pins Node 24 and pnpm 11.7.0 for reproducible local checks and packaging
 - Dependabot for npm dependency updates; GitHub Actions are intentionally disabled for now
 
 React reducer/local component state is used instead of Zustand. Vite builds the background and
