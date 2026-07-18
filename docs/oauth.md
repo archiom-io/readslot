@@ -26,9 +26,12 @@ finish revocation. Production requires a separate OAuth client associated with t
 extension ID. Release builds do not load the development `.env.local` automatically; provide the
 production Store client ID explicitly.
 
-The deployable public homepage, privacy policy, terms, support page, paste-ready scope
-justifications, verification video script, and production submission walkthrough are maintained in
-the [OAuth verification website folder](../oauth-verification-site/README.md).
+The public homepage, privacy policy, terms, and support pages are live at
+[archiom.io/apps/readslot](https://archiom.io/apps/readslot) — privacy, terms, and support at
+`/privacy`, `/terms`, and `/support`. The source templates, paste-ready scope justifications,
+verification video script, and production submission walkthrough are maintained in the
+[OAuth verification website folder](../oauth-verification-site/README.md); update both together
+whenever Calendar behavior, scopes, or data handling changes.
 
-The public repository and issue tracker now live in the Archiom organization:
+The public repository and issue tracker live in the Archiom organization:
 [`archiom-io/readslot`](https://github.com/archiom-io/readslot).

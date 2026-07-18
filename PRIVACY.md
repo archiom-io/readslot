@@ -1,5 +1,10 @@
 # ReadSlot Privacy Policy
 
+ReadSlot is published by Archiom. This file is a short summary — the canonical, most current
+privacy policy (the one submitted for Google OAuth verification) is hosted at
+[archiom.io/apps/readslot/privacy](https://archiom.io/apps/readslot/privacy). Update both together
+whenever Calendar behavior, scopes, or data handling changes.
+
 ReadSlot stores saved URLs, titles, notes, tags, estimates, settings, and reading history locally
 in the browser. It does not operate a server, sell data, display advertising, or collect
 analytics.
