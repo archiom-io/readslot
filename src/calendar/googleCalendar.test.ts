@@ -87,6 +87,23 @@ describe("GoogleCalendarGateway", () => {
     expect(mockedChrome.storage.local.set).not.toHaveBeenCalled();
   });
 
+  it("reports a dedicated error when reading the calendar list is forbidden", async () => {
+    const mockedChrome = chromeMock();
+    vi.stubGlobal("chrome", mockedChrome);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 403 }))
+    );
+
+    const result = await new GoogleCalendarGateway().listCalendars();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("CALENDAR_LIST_FORBIDDEN");
+      expect(result.error.message).toContain("calendar list");
+    }
+  });
+
   it("keeps an explicit disconnect from silently reconnecting", async () => {
     const mockedChrome = chromeMock();
     vi.mocked(mockedChrome.storage.local.get).mockResolvedValue({

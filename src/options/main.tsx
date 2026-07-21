@@ -16,12 +16,12 @@ const App = () => {
   const [calendars, setCalendars] = useState<CalendarSummary[]>([]);
   const [calendarsLoaded, setCalendarsLoaded] = useState(false);
   const [calendarListStatus, setCalendarListStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
-  const [calendarListError, setCalendarListError] = useState<string>();
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>({
     configured: false,
     connected: false
   });
   const [notice, setNotice] = useState<{ tone: "success" | "danger" | "info"; text: string }>();
+  const [calendarListError, setCalendarListError] = useState<{ code: string; message: string }>();
   const [confirmation, setConfirmation] = useState("");
   const selectedCalendarId = settings?.destinationCalendarId ?? "primary";
   const selectedCalendar =
@@ -60,7 +60,10 @@ const App = () => {
         } else {
           setCalendars([]);
           setCalendarListStatus("error");
-          setCalendarListError(calendarResult.error.message);
+          setCalendarListError({
+            code: calendarResult.error.code,
+            message: calendarResult.error.message
+          });
         }
         setCalendarsLoaded(true);
       }
@@ -439,7 +442,7 @@ const App = () => {
                   </div>
                   {calendarListError && (
                     <Notice tone="danger" style={{ marginTop: 12 }}>
-                      Calendar list error: {calendarListError}
+                      Calendar list error: {calendarListError.code} · {calendarListError.message}
                     </Notice>
                   )}
                   <details style={{ marginTop: 12 }}>

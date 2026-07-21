@@ -14,6 +14,11 @@ const API_ROOT = "https://www.googleapis.com/calendar/v3";
 const REVOCATION_ENDPOINT = "https://oauth2.googleapis.com/revoke";
 const DISCONNECTED_KEY = "readslot.googleCalendarDisconnected";
 
+interface RequestOptions {
+  forbiddenCode: "CALENDAR_READ_ONLY" | "CALENDAR_LIST_FORBIDDEN" | "CALENDAR_BUSY_FORBIDDEN";
+  forbiddenMessage: string;
+}
+
 export class GoogleCalendarGateway implements CalendarGateway {
   private tokenState?: TokenState;
 
@@ -101,7 +106,11 @@ export class GoogleCalendarGateway implements CalendarGateway {
     return revocation;
   }
 
-  private async request<T>(path: string, init?: RequestInit): Promise<Result<T>> {
+  private async request<T>(
+    path: string,
+    options: RequestOptions,
+    init?: RequestInit
+  ): Promise<Result<T>> {
     const connection = this.tokenState ? ok(undefined) : await this.connect(false);
     if (!connection.ok || !this.tokenState) return connection as Result<T>;
     const controller = new AbortController();
@@ -123,10 +132,7 @@ export class GoogleCalendarGateway implements CalendarGateway {
         });
       }
       if (response.status === 403)
-        return err({
-          code: "CALENDAR_READ_ONLY",
-          message: "The selected calendar is not writable."
-        });
+        return err({ code: options.forbiddenCode, message: options.forbiddenMessage });
       if (response.status === 404)
         return err({
           code: "CALENDAR_EVENT_NOT_FOUND",
@@ -169,7 +175,14 @@ export class GoogleCalendarGateway implements CalendarGateway {
         primary?: boolean;
         accessRole: CalendarSummary["accessRole"];
       }>;
-    }>("/users/me/calendarList?minAccessRole=freeBusyReader");
+    }>(
+      "/users/me/calendarList?minAccessRole=freeBusyReader",
+      {
+        forbiddenCode: "CALENDAR_LIST_FORBIDDEN",
+        forbiddenMessage:
+          "Google Calendar did not allow ReadSlot to read your calendar list. Check the connected account, Calendar API settings, and the granted permissions."
+      }
+    );
     if (!response.ok) return response;
     return ok(
       (response.value.items ?? []).map((item) => ({
@@ -189,6 +202,11 @@ export class GoogleCalendarGateway implements CalendarGateway {
   ): Promise<Result<BusyInterval[]>> {
     const response = await this.request<{ calendars?: Record<string, { busy?: BusyInterval[] }> }>(
       "/freeBusy",
+      {
+        forbiddenCode: "CALENDAR_BUSY_FORBIDDEN",
+        forbiddenMessage:
+          "Google Calendar did not allow ReadSlot to read free/busy availability for the selected calendars. Check the connected account and granted permissions."
+      },
       {
         method: "POST",
         body: JSON.stringify({
@@ -213,7 +231,13 @@ export class GoogleCalendarGateway implements CalendarGateway {
       id: string;
       start?: { dateTime?: string };
       end?: { dateTime?: string };
-    }>(`/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`);
+    }>(
+      `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+      {
+        forbiddenCode: "CALENDAR_READ_ONLY",
+        forbiddenMessage: "The selected calendar is not writable."
+      }
+    );
     if (!response.ok) {
       if (response.error.code === "CALENDAR_EVENT_NOT_FOUND") return ok(undefined);
       return response;
@@ -233,10 +257,16 @@ export class GoogleCalendarGateway implements CalendarGateway {
       id: string;
       start: { dateTime: string };
       end: { dateTime: string };
-    }>(`/calendars/${encodeURIComponent(input.calendarId)}/events`, {
-      method: "POST",
-      body: JSON.stringify({
-        id: input.eventId,
+    }>(
+      `/calendars/${encodeURIComponent(input.calendarId)}/events`,
+      {
+        forbiddenCode: "CALENDAR_READ_ONLY",
+        forbiddenMessage: "The selected calendar is not writable."
+      },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          id: input.eventId,
         summary: input.title,
         description: input.description,
         start: { dateTime: input.start, timeZone: input.timezone },
@@ -251,7 +281,8 @@ export class GoogleCalendarGateway implements CalendarGateway {
               },
         extendedProperties: { private: input.privateProperties }
       })
-    });
+      }
+    );
     if (!response.ok) return response;
     return ok({
       id: response.value.id,
