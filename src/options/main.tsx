@@ -32,6 +32,8 @@ const App = () => {
   const selectedCalendarWritable = selectedCalendar
     ? isWritableCalendar(selectedCalendar.accessRole)
     : false;
+  const selectedCalendarLabel =
+    selectedCalendar?.summary ?? (selectedCalendarId === "primary" ? "Primary calendar" : "Selected calendar");
 
   const load = async () => {
     setCalendarsLoaded(false);
@@ -361,9 +363,12 @@ const App = () => {
                 {calendarsLoaded && (
                   <>
                     <p className="subtle" aria-live="polite" style={{ marginTop: 8 }}>
+                      <strong>{selectedCalendarLabel}:</strong>{" "}
                       {selectedCalendar
-                        ? `Selected access role: ${selectedCalendar.accessRole}.`
-                        : "The saved destination calendar is not currently in the connected account."}
+                        ? selectedCalendarWritable
+                          ? "writable"
+                          : "read-only"
+                        : "not currently in the connected account"}
                     </p>
                     {!selectedCalendarWritable && (
                       <Notice tone="warning">
