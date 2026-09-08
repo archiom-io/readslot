@@ -92,7 +92,20 @@ describe("GoogleCalendarGateway", () => {
     vi.stubGlobal("chrome", mockedChrome);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response("{}", { status: 403 }))
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: 403,
+                message: "Calendar list permission missing",
+                status: "PERMISSION_DENIED",
+                errors: [{ domain: "global", reason: "forbidden", message: "Forbidden" }]
+              }
+            }),
+            { status: 403, headers: { "Content-Type": "application/json" } }
+          )
+      )
     );
 
     const result = await new GoogleCalendarGateway().listCalendars();
@@ -101,6 +114,11 @@ describe("GoogleCalendarGateway", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("CALENDAR_LIST_FORBIDDEN");
       expect(result.error.message).toContain("calendar list");
+      expect(result.error.context).toMatchObject({
+        httpStatus: 403,
+        googleReason: "forbidden",
+        googleStatus: "PERMISSION_DENIED"
+      });
     }
   });
 

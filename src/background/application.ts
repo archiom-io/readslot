@@ -177,10 +177,9 @@ const confirmProposal = async (
     if (!destinationCalendar || !isWritableCalendar(destinationCalendar.accessRole)) {
       return err({
         code: "CALENDAR_READ_ONLY",
-        message:
-          destinationCalendar?.summary
-            ? `The selected calendar (${destinationCalendar.summary}) is not writable. Open Settings and choose a calendar where you have writer or owner access.`
-            : "The selected calendar is not writable or is no longer available. Open Settings and choose a calendar where you have writer or owner access."
+        message: destinationCalendar?.summary
+          ? `The selected calendar (${destinationCalendar.summary}) is not writable. Open Settings and choose a calendar where you have writer or owner access.`
+          : "The selected calendar is not writable or is no longer available. Open Settings and choose a calendar where you have writer or owner access."
       });
     }
     if (overlap(proposal, busy.value) && !conflictOverride) {

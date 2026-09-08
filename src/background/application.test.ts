@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { err, ok } from "../domain/result";
+import { err, ok, type Result } from "../domain/result";
+import type { CalendarSummary } from "../domain/ports";
 import {
   ProposalSchema,
   ReadingItemSchema,
@@ -14,7 +15,7 @@ const calendarMocks = vi.hoisted(() => ({
   isConfigured: vi.fn(() => true),
   connect: vi.fn(async () => ok(undefined)),
   disconnect: vi.fn(async () => ok(undefined)),
-  listCalendars: vi.fn(async () => ok([])),
+  listCalendars: vi.fn(async (): Promise<Result<CalendarSummary[]>> => ok([])),
   getBusy: vi.fn(async () => ok([])),
   getEvent: vi.fn(),
   createEvent: vi.fn()
