@@ -707,6 +707,12 @@ Defaults:
 - Configurable
 - Optional disabled reminder
 
+Daily recurring reminders:
+- Item-specific recurrence schedule (time of day, days of week, optional Google Calendar sync)
+- Settings-level daily habit reminders (multiple customizable alerts with custom labels and active days)
+- Local Chrome desktop notifications with source link navigation on click
+- Recurring items remain queued upon session completion to stay active for future days
+
 ## Event identifiers
 
 Store:

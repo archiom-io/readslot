@@ -269,4 +269,37 @@ describe("GoogleCalendarGateway", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("CALENDAR_EVENT_EXISTS");
   });
+
+  it("passes recurrence rules to the insert payload", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            id: "readslot-recurring-01",
+            start: { dateTime: "2026-07-14T20:00:00.000Z" },
+            end: { dateTime: "2026-07-14T20:30:00.000Z" }
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await new GoogleCalendarGateway().createEvent({
+      eventId: "readslotrec01",
+      calendarId: "primary",
+      title: "ReadSlot — Daily Newspaper",
+      description: "Daily reading block",
+      start: "2026-07-14T20:00:00.000Z",
+      end: "2026-07-14T20:30:00.000Z",
+      timezone: "Asia/Dhaka",
+      transparency: "opaque",
+      recurrence: ["RRULE:FREQ=DAILY"],
+      privateProperties: { readslotItemId: "item-newspaper" }
+    });
+    expect(result.ok).toBe(true);
+    const request = fetchMock.mock.calls[0][1];
+    expect(JSON.parse(request?.body as string)).toMatchObject({
+      id: "readslotrec01",
+      recurrence: ["RRULE:FREQ=DAILY"]
+    });
+  });
 });

@@ -83,7 +83,8 @@ a {
 }
 nav {
   display: flex;
-  gap: 22px;
+  align-items: center;
+  gap: 20px;
 }
 nav a {
   color: var(--muted);
@@ -92,6 +93,31 @@ nav a {
 }
 nav a:hover {
   color: var(--purple);
+}
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid #1a73e8;
+  color: #fff;
+  background: #1a73e8;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease-in-out;
+}
+.nav-cta:hover:not(:disabled) {
+  background: #1557b0;
+  border-color: #1557b0;
+  box-shadow: 0 6px 16px rgba(26, 115, 232, 0.45);
+  transform: translateY(-1px);
+}
+.nav-cta:active:not(:disabled) {
+  transform: translateY(0);
 }
 main {
   width: min(1160px, calc(100% - 40px));

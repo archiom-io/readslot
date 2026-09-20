@@ -36,6 +36,24 @@ export const CapturePreviewSchema = z.object({
 
 const IsoDateSchema = z.iso.datetime({ offset: true });
 
+export const RecurrenceScheduleSchema = z.object({
+  enabled: z.boolean(),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:mm"),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).default([0, 1, 2, 3, 4, 5, 6]),
+  addToCalendar: z.boolean().default(false),
+  calendarEventId: z.string().optional()
+});
+
+export const DailyHabitReminderSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().trim().min(1).max(100).default("Daily reading"),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:mm"),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).default([0, 1, 2, 3, 4, 5, 6]),
+  enabled: z.boolean().default(true),
+  addToCalendar: z.boolean().default(false),
+  calendarEventId: z.string().optional()
+});
+
 export const ReadingItemSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   id: z.string().min(1),
@@ -56,6 +74,7 @@ export const ReadingItemSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(50)).max(50),
   collectionId: z.string().max(100).optional(),
   notes: z.string().max(20_000).optional(),
+  recurrence: RecurrenceScheduleSchema.optional(),
   status: ItemStatusSchema,
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,
@@ -128,6 +147,7 @@ export const SettingsSchema = z.object({
   respectDeclinedEvents: z.boolean(),
   treatTentativeAsBusy: z.boolean(),
   weeklyPlanningNotification: z.boolean(),
+  dailyReminders: z.array(DailyHabitReminderSchema).default([]),
   privacyMode: z.boolean()
 });
 
@@ -157,6 +177,8 @@ export type ContentType = z.infer<typeof ContentTypeSchema>;
 export type ItemStatus = z.infer<typeof ItemStatusSchema>;
 export type Priority = z.infer<typeof PrioritySchema>;
 export type CapturePreview = z.infer<typeof CapturePreviewSchema>;
+export type RecurrenceSchedule = z.infer<typeof RecurrenceScheduleSchema>;
+export type DailyHabitReminder = z.infer<typeof DailyHabitReminderSchema>;
 export type ReadingItem = z.infer<typeof ReadingItemSchema>;
 export type Proposal = z.infer<typeof ProposalSchema>;
 export type ReadingSession = z.infer<typeof ReadingSessionSchema>;

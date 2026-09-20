@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { isWritableCalendar } from "../domain/calendar";
-import { SettingsSchema, type Settings } from "../domain/schemas";
+import { SettingsSchema, type DailyHabitReminder, type Settings } from "../domain/schemas";
 import type { CalendarSummary } from "../domain/ports";
 import { sendMessage } from "../shared/client";
 import { Notice, PageShell } from "../shared/ui";
@@ -329,6 +329,178 @@ const App = () => {
               />
               Weekly planning reminder
             </label>
+
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: 15 }}>Daily Reading Reminders</h3>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  style={{ fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => {
+                    const newReminder: DailyHabitReminder = {
+                      id: crypto.randomUUID(),
+                      label: "Daily reading",
+                      time: "20:00",
+                      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                      enabled: true,
+                      addToCalendar: false
+                    };
+                    setSettings({
+                      ...settings,
+                      dailyReminders: [...(settings.dailyReminders ?? []), newReminder]
+                    });
+                  }}
+                >
+                  + Add daily reminder
+                </button>
+              </div>
+              <p className="subtle" style={{ fontSize: 13, marginBottom: 12 }}>
+                Set multiple recurring alerts to build a daily reading habit.
+              </p>
+
+              {(settings.dailyReminders ?? []).length === 0 ? (
+                <p style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>
+                  No daily habit reminders configured yet.
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {settings.dailyReminders.map((reminder, index) => (
+                    <div
+                      key={reminder.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 6,
+                        border: "1px solid #e5e7eb",
+                        backgroundColor: "#fafafa"
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          marginBottom: 8
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 13
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={reminder.enabled}
+                            onChange={(e) => {
+                              const updated = [...settings.dailyReminders];
+                              updated[index] = { ...reminder, enabled: e.target.checked };
+                              setSettings({ ...settings, dailyReminders: updated });
+                            }}
+                          />
+                          <strong>Active</strong>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Label (e.g. Daily newspaper study)"
+                          value={reminder.label}
+                          style={{
+                            flex: 1,
+                            minWidth: 140,
+                            padding: "4px 8px",
+                            fontSize: 13,
+                            borderRadius: 4,
+                            border: "1px solid #ccc"
+                          }}
+                          onChange={(e) => {
+                            const updated = [...settings.dailyReminders];
+                            updated[index] = { ...reminder, label: e.target.value };
+                            setSettings({ ...settings, dailyReminders: updated });
+                          }}
+                        />
+                        <input
+                          type="time"
+                          value={reminder.time}
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: 13,
+                            borderRadius: 4,
+                            border: "1px solid #ccc"
+                          }}
+                          onChange={(e) => {
+                            const updated = [...settings.dailyReminders];
+                            updated[index] = { ...reminder, time: e.target.value };
+                            setSettings({ ...settings, dailyReminders: updated });
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="button button-danger"
+                          style={{ fontSize: 11, padding: "3px 8px" }}
+                          onClick={() => {
+                            const updated = settings.dailyReminders.filter((_, i) => i !== index);
+                            setSettings({ ...settings, dailyReminders: updated });
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                        {[
+                          { day: 0, label: "Sun" },
+                          { day: 1, label: "Mon" },
+                          { day: 2, label: "Tue" },
+                          { day: 3, label: "Wed" },
+                          { day: 4, label: "Thu" },
+                          { day: 5, label: "Fri" },
+                          { day: 6, label: "Sat" }
+                        ].map(({ day, label }) => (
+                          <label
+                            key={day}
+                            style={{
+                              fontSize: 11,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                              cursor: "pointer",
+                              background: reminder.daysOfWeek.includes(day) ? "#e0e7ff" : "#fff",
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              border: "1px solid #d1d5db"
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={reminder.daysOfWeek.includes(day)}
+                              onChange={(e) => {
+                                const nextDays = e.target.checked
+                                  ? [...reminder.daysOfWeek, day].sort()
+                                  : reminder.daysOfWeek.filter((d) => d !== day);
+                                const updated = [...settings.dailyReminders];
+                                updated[index] = { ...reminder, daysOfWeek: nextDays };
+                                setSettings({ ...settings, dailyReminders: updated });
+                              }}
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="actions" style={{ marginTop: 18 }}>
             <button className="button button-primary" type="submit">

@@ -4,11 +4,13 @@ import {
   SCHEMA_VERSION,
   ReadingItemSchema,
   type CapturePreview,
-  type ReadingItem
+  type ReadingItem,
+  type RecurrenceSchedule
 } from "../domain/schemas";
 import { detectContentType, normalizeUrl } from "../domain/url";
 import type { ReadingRepository, SettingsRepository } from "../domain/ports";
 import { err, ok, type Result } from "../domain/result";
+import { scheduleItemAlarm } from "./reminders";
 
 interface ExtractedMetadata {
   title?: string;
@@ -34,9 +36,11 @@ export class CaptureService {
     }
   }
 
-  async fromCurrentTab(): Promise<Result<{ item: ReadingItem; duplicate: boolean }>> {
+  async fromCurrentTab(
+    recurrence?: RecurrenceSchedule
+  ): Promise<Result<{ item: ReadingItem; duplicate: boolean }>> {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    return this.fromTab(tab);
+    return this.fromTab(tab, recurrence);
   }
 
   async previewCurrentTab(): Promise<Result<CapturePreview>> {
@@ -91,7 +95,10 @@ export class CaptureService {
     }
   }
 
-  async fromTab(tab: chrome.tabs.Tab): Promise<Result<{ item: ReadingItem; duplicate: boolean }>> {
+  async fromTab(
+    tab: chrome.tabs.Tab,
+    recurrence?: RecurrenceSchedule
+  ): Promise<Result<{ item: ReadingItem; duplicate: boolean }>> {
     if (!tab.id || !tab.url)
       return err({ code: "UNSUPPORTED_PAGE", message: "This page cannot be saved." });
     const metadata = await this.extract(tab.id);
@@ -100,7 +107,8 @@ export class CaptureService {
       metadata.title ?? tab.title,
       undefined,
       metadata,
-      tab.url
+      tab.url,
+      recurrence
     );
   }
 
@@ -109,7 +117,8 @@ export class CaptureService {
     title?: string,
     notes?: string,
     metadata: ExtractedMetadata = {},
-    originalUrlOverride?: string
+    originalUrlOverride?: string,
+    recurrence?: RecurrenceSchedule
   ): Promise<Result<{ item: ReadingItem; duplicate: boolean }>> {
     try {
       const currentSettings = await this.settings.get();
@@ -126,9 +135,20 @@ export class CaptureService {
         if (existing.value.status === "deleted") {
           const restored = await this.items.update(existing.value.id, {
             status: "queued",
-            deletedAt: undefined
+            deletedAt: undefined,
+            recurrence: recurrence ?? existing.value.recurrence
           });
+          if (restored.ok && restored.value.recurrence?.enabled) {
+            await scheduleItemAlarm(restored.value);
+          }
           return restored.ok ? ok({ item: restored.value, duplicate: false }) : restored;
+        }
+        if (recurrence) {
+          const updated = await this.items.update(existing.value.id, { recurrence });
+          if (updated.ok && updated.value.recurrence?.enabled) {
+            await scheduleItemAlarm(updated.value);
+          }
+          return updated.ok ? ok({ item: updated.value, duplicate: true }) : updated;
         }
         return ok({ item: existing.value, duplicate: true });
       }
@@ -161,11 +181,15 @@ export class CaptureService {
         priority: "normal",
         tags: [],
         notes,
+        recurrence,
         status: "queued",
         createdAt: now,
         updatedAt: now
       });
       const stored = await this.items.put(item);
+      if (stored.ok && stored.value.recurrence?.enabled) {
+        await scheduleItemAlarm(stored.value);
+      }
       return stored.ok ? ok({ item: stored.value, duplicate: false }) : stored;
     } catch (error) {
       return err({

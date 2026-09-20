@@ -17,6 +17,9 @@ export const PopupApp = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [undoItemId, setUndoItemId] = useState<string>();
+  const [dailyReminder, setDailyReminder] = useState(false);
+  const [reminderTime, setReminderTime] = useState("20:00");
+  const [addToCalendar, setAddToCalendar] = useState(false);
 
   const loadPreview = async () => {
     setLoading(true);
@@ -41,9 +44,17 @@ export const PopupApp = () => {
 
   const capture = async (): Promise<ReadingItem | undefined> => {
     setBusy(true);
+    const recurrence = dailyReminder
+      ? {
+          enabled: true,
+          time: reminderTime,
+          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+          addToCalendar
+        }
+      : undefined;
     const result = await sendMessage<{ item: ReadingItem; duplicate: boolean }>({
       type: "capture.current",
-      payload: {}
+      payload: recurrence ? { recurrence } : {}
     });
     setBusy(false);
     if (!result.ok) {
@@ -64,7 +75,11 @@ export const PopupApp = () => {
     setUndoItemId(duplicate ? undefined : item.id);
     setNotice({
       tone: duplicate ? "info" : "success",
-      text: duplicate ? "Already saved in ReadSlot." : "Saved to ReadSlot."
+      text: duplicate
+        ? "Already saved in ReadSlot."
+        : dailyReminder
+          ? `Saved with daily reminder at ${reminderTime}.`
+          : "Saved to ReadSlot."
     });
     return item;
   };
@@ -139,6 +154,68 @@ export const PopupApp = () => {
             </Notice>
           )}
           {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
+
+          <div
+            style={{
+              marginTop: 10,
+              marginBottom: 12,
+              paddingTop: 8,
+              borderTop: "1px solid #e5e7eb"
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                cursor: "pointer",
+                fontSize: 13
+              }}
+            >
+              <input
+                type="checkbox"
+                aria-label="Set daily reminder"
+                checked={dailyReminder}
+                onChange={(e) => setDailyReminder(e.target.checked)}
+              />
+              <span>Remind me daily at</span>
+              <input
+                type="time"
+                aria-label="Reminder time"
+                value={reminderTime}
+                disabled={!dailyReminder}
+                onChange={(e) => setReminderTime(e.target.value)}
+                style={{
+                  fontSize: 12,
+                  padding: "2px 4px",
+                  borderRadius: 4,
+                  border: "1px solid #ccc"
+                }}
+              />
+            </label>
+            {dailyReminder && (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 6,
+                  marginLeft: 22,
+                  fontSize: 12,
+                  color: "#666",
+                  cursor: "pointer"
+                }}
+              >
+                <input
+                  type="checkbox"
+                  aria-label="Sync with Google Calendar"
+                  checked={addToCalendar}
+                  onChange={(e) => setAddToCalendar(e.target.checked)}
+                />
+                <span>Sync with Google Calendar</span>
+              </label>
+            )}
+          </div>
 
           <div className="popup-actions">
             <button

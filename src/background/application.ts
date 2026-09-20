@@ -27,6 +27,13 @@ import { normalizeUrl } from "../domain/url";
 import { parseImportedUrls } from "../domain/import";
 import { canTransitionItem } from "../domain/transitions";
 import { isWritableCalendar } from "../domain/calendar";
+import {
+  buildRRule,
+  clearHabitAlarm,
+  clearItemAlarm,
+  scheduleHabitAlarm,
+  scheduleItemAlarm
+} from "./reminders";
 
 const items = new DexieReadingRepository();
 const proposals = new DexieProposalRepository();
@@ -97,14 +104,16 @@ const reviewSession = async (
       });
 
     const parsedItems = currentItems.map((item) => ReadingItemSchema.parse(item));
-    const targetStatus = (itemId: string) =>
-      completed.has(itemId)
-        ? ("completed" as const)
-        : skipped.has(itemId)
-          ? ("archived" as const)
-          : ("queued" as const);
+    const targetStatus = (item: (typeof parsedItems)[number]) =>
+      item.recurrence?.enabled && completed.has(item.id)
+        ? ("queued" as const)
+        : completed.has(item.id)
+          ? ("completed" as const)
+          : skipped.has(item.id)
+            ? ("archived" as const)
+            : ("queued" as const);
     const invalidItem = parsedItems.find(
-      (item) => !canTransitionItem(item.status, targetStatus(item.id))
+      (item) => !canTransitionItem(item.status, targetStatus(item))
     );
     if (invalidItem)
       return err({
@@ -113,11 +122,12 @@ const reviewSession = async (
       });
 
     const updatedItems = parsedItems.map((current) => {
-      const status = targetStatus(current.id);
+      const status = targetStatus(current);
       return ReadingItemSchema.parse({
         ...current,
         status,
-        completedAt: status === "completed" ? now : undefined,
+        lastOpenedAt: completed.has(current.id) ? now : current.lastOpenedAt,
+        completedAt: status === "completed" ? now : current.completedAt,
         archivedAt: status === "archived" ? now : undefined,
         updatedAt: now
       });
@@ -279,17 +289,98 @@ export const handleMessage = async (input: unknown): Promise<Result<unknown>> =>
       case "capture.preview":
         return capture.previewCurrentTab();
       case "capture.current":
-        return capture.fromCurrentTab();
+        return capture.fromCurrentTab(message.payload.recurrence);
       case "capture.url":
-        return capture.fromUrl(message.payload.url, message.payload.title, message.payload.notes);
+        return capture.fromUrl(
+          message.payload.url,
+          message.payload.title,
+          message.payload.notes,
+          {},
+          undefined,
+          message.payload.recurrence
+        );
       case "capture.undo":
         return items.remove(message.payload.itemId);
       case "items.list":
         return items.list(message.payload);
-      case "items.update":
-        return items.update(message.payload.id, message.payload.changes);
-      case "items.remove":
-        return items.remove(message.payload.id, message.payload.permanent);
+      case "items.update": {
+        const result = await items.update(message.payload.id, message.payload.changes);
+        if (result.ok) {
+          await scheduleItemAlarm(result.value);
+          const item = result.value;
+          if (
+            item.recurrence?.enabled &&
+            item.recurrence.addToCalendar &&
+            !item.recurrence.calendarEventId
+          ) {
+            const settingsResult = await settings.get();
+            if (settingsResult.ok && settingsResult.value.destinationCalendarId) {
+              const calendarId = settingsResult.value.destinationCalendarId;
+              const [hours, minutes] = item.recurrence.time.split(":").map(Number);
+              const startObj = new Date();
+              startObj.setHours(hours, minutes, 0, 0);
+              const duration = item.plannedMinutes ?? item.estimatedMinutes ?? 30;
+              const endObj = new Date(startObj.getTime() + duration * 60 * 1000);
+              const created = await calendar.createEvent({
+                eventId: `rs${item.id.slice(0, 16)}${Date.now().toString(36)}`
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/g, ""),
+                calendarId,
+                title: `ReadSlot — ${item.title}`,
+                description: `Daily reading block for ${item.originalUrl}`,
+                start: startObj.toISOString(),
+                end: endObj.toISOString(),
+                timezone: settingsResult.value.timezone,
+                transparency: "opaque",
+                reminderMinutes: settingsResult.value.defaultReminderMinutes,
+                recurrence: buildRRule(item.recurrence.daysOfWeek),
+                privateProperties: { readslotItemId: item.id, recurring: "true" }
+              });
+              if (created.ok) {
+                const withCal = await items.update(item.id, {
+                  recurrence: { ...item.recurrence, calendarEventId: created.value.id }
+                });
+                if (withCal.ok) return withCal;
+              }
+            }
+          } else if (
+            item.recurrence?.calendarEventId &&
+            (!item.recurrence.enabled || !item.recurrence.addToCalendar)
+          ) {
+            if (calendar.deleteEvent) {
+              const settingsResult = await settings.get();
+              if (settingsResult.ok && settingsResult.value.destinationCalendarId) {
+                await calendar.deleteEvent(
+                  settingsResult.value.destinationCalendarId,
+                  item.recurrence.calendarEventId
+                );
+                const withoutCal = await items.update(item.id, {
+                  recurrence: { ...item.recurrence, calendarEventId: undefined }
+                });
+                if (withoutCal.ok) return withoutCal;
+              }
+            }
+          }
+        }
+        return result;
+      }
+      case "items.remove": {
+        const existing = await items.get(message.payload.id);
+        if (existing.ok && existing.value.recurrence?.calendarEventId && calendar.deleteEvent) {
+          const settingsResult = await settings.get();
+          if (settingsResult.ok && settingsResult.value.destinationCalendarId) {
+            await calendar.deleteEvent(
+              settingsResult.value.destinationCalendarId,
+              existing.value.recurrence.calendarEventId
+            );
+          }
+        }
+        const result = await items.remove(message.payload.id, message.payload.permanent);
+        if (result.ok) {
+          await clearItemAlarm(message.payload.id);
+        }
+        return result;
+      }
       case "settings.get":
         return settings.get();
       case "settings.update": {
@@ -302,6 +393,15 @@ export const handleMessage = async (input: unknown): Promise<Result<unknown>> =>
               periodInMinutes: 7 * 24 * 60
             });
           else await chrome.alarms.clear("readslot-weekly-plan");
+
+          // Sync habit reminders
+          for (const habit of next.dailyReminders ?? []) {
+            if (habit.enabled) {
+              await scheduleHabitAlarm(habit);
+            } else {
+              await clearHabitAlarm(habit.id);
+            }
+          }
         }
         return saved;
       }

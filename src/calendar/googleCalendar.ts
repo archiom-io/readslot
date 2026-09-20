@@ -315,6 +315,7 @@ export class GoogleCalendarGateway implements CalendarGateway {
           start: { dateTime: input.start, timeZone: input.timezone },
           end: { dateTime: input.end, timeZone: input.timezone },
           transparency: input.transparency,
+          ...(input.recurrence ? { recurrence: input.recurrence } : {}),
           reminders:
             input.reminderMinutes === undefined
               ? { useDefault: false }
@@ -332,5 +333,20 @@ export class GoogleCalendarGateway implements CalendarGateway {
       start: response.value.start.dateTime,
       end: response.value.end.dateTime
     });
+  }
+
+  async deleteEvent(calendarId: string, eventId: string): Promise<Result<void>> {
+    const response = await this.request<unknown>(
+      `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+      {
+        forbiddenCode: "CALENDAR_READ_ONLY",
+        forbiddenMessage: "The selected calendar is not writable."
+      },
+      {
+        method: "DELETE"
+      }
+    );
+    if (!response.ok) return response;
+    return ok(undefined);
   }
 }

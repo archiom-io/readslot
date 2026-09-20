@@ -1,6 +1,12 @@
 import { StrictMode, useEffect, useMemo, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
-import type { Backup, ItemStatus, Priority, ReadingItem } from "../domain/schemas";
+import type {
+  Backup,
+  ItemStatus,
+  Priority,
+  ReadingItem,
+  RecurrenceSchedule
+} from "../domain/schemas";
 import { extensionUrl, sendMessage } from "../shared/client";
 import { EmptyState, Notice, PageShell, formatMinutes } from "../shared/ui";
 
@@ -34,6 +40,13 @@ const App = () => {
   const [url, setUrl] = useState("");
   const [notice, setNotice] = useState<{ tone: "success" | "danger" | "info"; text: string }>();
   const [loading, setLoading] = useState(true);
+  const [editingReminder, setEditingReminder] = useState<ReadingItem>();
+  const [reminderForm, setReminderForm] = useState<RecurrenceSchedule>({
+    enabled: true,
+    time: "20:00",
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    addToCalendar: false
+  });
 
   const load = async () => {
     setLoading(true);
@@ -82,7 +95,12 @@ const App = () => {
 
   const update = async (
     id: string,
-    changes: { status?: ItemStatus; priority?: Priority; plannedMinutes?: number }
+    changes: {
+      status?: ItemStatus;
+      priority?: Priority;
+      plannedMinutes?: number;
+      recurrence?: RecurrenceSchedule;
+    }
   ) => {
     const result = await sendMessage<ReadingItem>({
       type: "items.update",
@@ -364,9 +382,34 @@ const App = () => {
                       {item.priority}
                     </span>
                     <span className="pill">{item.status}</span>
+                    {item.recurrence?.enabled && (
+                      <span
+                        className="pill"
+                        style={{ backgroundColor: "#e0f2fe", color: "#0369a1", fontWeight: 600 }}
+                      >
+                        🔁 Daily @ {item.recurrence.time}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="actions">
+                  <button
+                    className="button button-quiet"
+                    title="Configure daily reminder"
+                    onClick={() => {
+                      setReminderForm(
+                        item.recurrence ?? {
+                          enabled: true,
+                          time: "20:00",
+                          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                          addToCalendar: false
+                        }
+                      );
+                      setEditingReminder(item);
+                    }}
+                  >
+                    Reminder
+                  </button>
                   <select
                     aria-label={`Priority for ${item.title}`}
                     value={item.priority}
@@ -410,13 +453,25 @@ const App = () => {
                     <>
                       <button
                         className="button button-quiet"
-                        onClick={() =>
-                          void update(item.id, {
-                            status: item.status === "completed" ? "queued" : "completed"
-                          })
-                        }
+                        onClick={() => {
+                          if (item.recurrence?.enabled) {
+                            void update(item.id, { status: "queued" });
+                            setNotice({
+                              tone: "success",
+                              text: `Finished reading today. Reminder scheduled again for ${item.recurrence.time} tomorrow.`
+                            });
+                          } else {
+                            void update(item.id, {
+                              status: item.status === "completed" ? "queued" : "completed"
+                            });
+                          }
+                        }}
                       >
-                        {item.status === "completed" ? "Mark unread" : "Complete"}
+                        {item.recurrence?.enabled
+                          ? "Done for today"
+                          : item.status === "completed"
+                            ? "Mark unread"
+                            : "Complete"}
                       </button>
                       <button className="button button-quiet" onClick={() => void remove(item.id)}>
                         Delete
@@ -429,6 +484,158 @@ const App = () => {
           </ul>
         )}
       </section>
+
+      {editingReminder && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reminder-dialog-title"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000
+          }}
+        >
+          <div
+            className="panel"
+            style={{
+              maxWidth: 420,
+              width: "90%",
+              backgroundColor: "#fff",
+              padding: 24,
+              borderRadius: 8,
+              boxShadow: "0 10px 25px rgba(0,0,0,0.15)"
+            }}
+          >
+            <h2 id="reminder-dialog-title" style={{ fontSize: 18, marginBottom: 8 }}>
+              Daily Reading Reminder
+            </h2>
+            <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>{editingReminder.title}</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void update(editingReminder.id, {
+                  recurrence: reminderForm
+                });
+                setEditingReminder(undefined);
+              }}
+            >
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <input
+                  type="checkbox"
+                  checked={reminderForm.enabled}
+                  onChange={(e) => setReminderForm({ ...reminderForm, enabled: e.target.checked })}
+                />
+                <strong>Enable daily reminder</strong>
+              </label>
+
+              {reminderForm.enabled && (
+                <>
+                  <div style={{ marginBottom: 14 }}>
+                    <label
+                      htmlFor="reminder-time-input"
+                      style={{ display: "block", fontSize: 13, marginBottom: 4 }}
+                    >
+                      Reminder time:
+                    </label>
+                    <input
+                      id="reminder-time-input"
+                      type="time"
+                      value={reminderForm.time}
+                      onChange={(e) => setReminderForm({ ...reminderForm, time: e.target.value })}
+                      style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #ccc" }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={{ display: "block", fontSize: 13, marginBottom: 6 }}>
+                      Active days:
+                    </span>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {[
+                        { day: 0, label: "Sun" },
+                        { day: 1, label: "Mon" },
+                        { day: 2, label: "Tue" },
+                        { day: 3, label: "Wed" },
+                        { day: 4, label: "Thu" },
+                        { day: 5, label: "Fri" },
+                        { day: 6, label: "Sat" }
+                      ].map(({ day, label }) => (
+                        <label
+                          key={day}
+                          style={{
+                            fontSize: 12,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            cursor: "pointer",
+                            background: reminderForm.daysOfWeek.includes(day)
+                              ? "#e0e7ff"
+                              : "#f3f4f6",
+                            padding: "4px 8px",
+                            borderRadius: 4
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={reminderForm.daysOfWeek.includes(day)}
+                            onChange={(e) => {
+                              const nextDays = e.target.checked
+                                ? [...reminderForm.daysOfWeek, day].sort()
+                                : reminderForm.daysOfWeek.filter((d) => d !== day);
+                              setReminderForm({ ...reminderForm, daysOfWeek: nextDays });
+                            }}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      marginBottom: 16
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={reminderForm.addToCalendar}
+                      onChange={(e) =>
+                        setReminderForm({ ...reminderForm, addToCalendar: e.target.checked })
+                      }
+                    />
+                    Sync recurring block to Google Calendar
+                  </label>
+                </>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button
+                  type="button"
+                  className="button button-quiet"
+                  onClick={() => setEditingReminder(undefined)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="button button-primary">
+                  Save reminder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 };

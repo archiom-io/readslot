@@ -144,10 +144,10 @@ bundle/permission impact review.
 
 Core entities:
 
-- **ReadingItem:** captured content, estimate, priority, tags, lifecycle timestamps, and local status.
+- **ReadingItem:** captured content, estimate, priority, tags, optional recurrence schedule, lifecycle timestamps, and local status.
 - **Proposal:** one or more item IDs plus a candidate time, score, explanation, expiry, and validation state.
 - **ReadingSession:** the link between selected items and one confirmed Calendar event.
-- **Settings:** schedule boundaries, duration preferences, calendars, timezone, reminders, and conflict policy.
+- **Settings:** schedule boundaries, duration preferences, calendars, timezone, reminders (including multiple daily habit reminders), and conflict policy.
 
 Reading-item states:
 
@@ -163,6 +163,8 @@ Important rules:
 - Opening the toolbar popup never writes to the queue. Toolbar capture requires an explicit Save
   for later or Save & choose time action; context-menu and keyboard capture remain immediate.
 - An item can belong to only one active confirmed session.
+- Completing a recurring item preserves its `queued` status so it remains active for subsequent
+  scheduled daily reminders while recording session completion history.
 - A proposal expires after 24 hours by default and must be revalidated if stale.
 - Deletion is soft first; trash retention defaults to 30 days.
 - Deleting an item does not silently delete its Calendar event.

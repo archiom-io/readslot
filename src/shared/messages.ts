@@ -4,6 +4,7 @@ import {
   ItemStatusSchema,
   PrioritySchema,
   ProposalSchema,
+  RecurrenceScheduleSchema,
   SettingsSchema
 } from "../domain/schemas";
 
@@ -15,15 +16,24 @@ const ItemChangesSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(50)).optional(),
   collectionId: z.string().max(100).optional(),
   notes: z.string().max(20_000).optional(),
-  title: z.string().trim().min(1).max(500).optional()
+  title: z.string().trim().min(1).max(500).optional(),
+  recurrence: RecurrenceScheduleSchema.optional()
 });
 
 export const ExtensionMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("capture.preview"), payload: EmptyPayload }),
-  z.object({ type: z.literal("capture.current"), payload: EmptyPayload }),
+  z.object({
+    type: z.literal("capture.current"),
+    payload: z.object({ recurrence: RecurrenceScheduleSchema.optional() }).default({})
+  }),
   z.object({
     type: z.literal("capture.url"),
-    payload: z.object({ url: z.url(), title: z.string().optional(), notes: z.string().optional() })
+    payload: z.object({
+      url: z.url(),
+      title: z.string().optional(),
+      notes: z.string().optional(),
+      recurrence: RecurrenceScheduleSchema.optional()
+    })
   }),
   z.object({ type: z.literal("capture.undo"), payload: z.object({ itemId: z.string() }) }),
   z.object({

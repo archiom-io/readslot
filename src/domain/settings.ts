@@ -24,5 +24,6 @@ export const createDefaultSettings = (): Settings =>
     respectDeclinedEvents: true,
     treatTentativeAsBusy: true,
     weeklyPlanningNotification: false,
+    dailyReminders: [],
     privacyMode: false
   });

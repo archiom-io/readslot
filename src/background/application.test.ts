@@ -124,7 +124,10 @@ beforeEach(async () => {
         remove: vi.fn(async () => undefined)
       }
     },
-    alarms: { create: vi.fn(async () => undefined) },
+    alarms: {
+      create: vi.fn(async () => undefined),
+      clear: vi.fn(async () => undefined)
+    },
     runtime: { getManifest: vi.fn(() => ({ version: "0.9.0" })) }
   });
   calendarMocks.getBusy.mockResolvedValue(ok([]));
@@ -324,5 +327,65 @@ describe("session review", () => {
     expect((await database.items.get("item-one"))?.status).toBe("scheduled");
     expect((await database.items.get("item-two"))?.status).toBe("scheduled");
     expect((await database.sessions.get("session-one"))?.status).toBe("scheduled");
+  });
+
+  it("keeps a recurring item queued when completed during session review", async () => {
+    const recurringItem = {
+      ...makeItem("item-recurring", "scheduled"),
+      recurrence: {
+        enabled: true,
+        time: "20:00",
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        addToCalendar: false
+      }
+    };
+    await database.items.put(recurringItem);
+    const session = {
+      ...makeSession("scheduled"),
+      id: "session-recurring",
+      itemIds: ["item-recurring", "item-two"]
+    };
+    await database.sessions.put(session);
+
+    const result = await handleMessage({
+      type: "sessions.review",
+      payload: {
+        sessionId: "session-recurring",
+        completedItemIds: ["item-recurring"],
+        skippedItemIds: ["item-two"]
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    const updated = await database.items.get("item-recurring");
+    expect(updated?.status).toBe("queued");
+    expect(updated?.lastOpenedAt).toBeDefined();
+    expect((await database.items.get("item-two"))?.status).toBe("archived");
+    expect((await database.sessions.get("session-recurring"))?.status).toBe("completed");
+  });
+
+  it("schedules alarms when saving settings with daily reminders", async () => {
+    const settings = createDefaultSettings();
+    settings.dailyReminders = [
+      {
+        id: "habit-evening",
+        label: "Study Newspaper",
+        time: "20:00",
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        enabled: true,
+        addToCalendar: false
+      }
+    ];
+
+    const result = await handleMessage({
+      type: "settings.update",
+      payload: { settings }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(chrome.alarms.create).toHaveBeenCalledWith(
+      "reminder:habit:habit-evening",
+      expect.objectContaining({ periodInMinutes: 1440 })
+    );
   });
 });

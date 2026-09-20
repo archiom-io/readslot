@@ -100,4 +100,36 @@ describe("PopupApp", () => {
     expect(screen.queryByText(/already saved in readslot/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore to queue" })).toBeEnabled();
   });
+
+  it("saves an item with daily reminder when toggled", async () => {
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(ok(preview))
+      .mockResolvedValueOnce(ok({ item, duplicate: false }));
+    const user = userEvent.setup();
+    render(<PopupApp />);
+
+    await screen.findByRole("heading", { name: preview.title });
+
+    const reminderCheckbox = screen.getByLabelText("Set daily reminder");
+    await user.click(reminderCheckbox);
+
+    const timeInput = screen.getByLabelText("Reminder time");
+    await user.clear(timeInput);
+    await user.type(timeInput, "20:00");
+
+    await user.click(screen.getByRole("button", { name: "Save for later" }));
+
+    expect(sendMessage).toHaveBeenNthCalledWith(2, {
+      type: "capture.current",
+      payload: {
+        recurrence: {
+          enabled: true,
+          time: "20:00",
+          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+          addToCalendar: false
+        }
+      }
+    });
+    expect(await screen.findByText(/Saved with daily reminder/i)).toBeInTheDocument();
+  });
 });

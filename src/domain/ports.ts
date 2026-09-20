@@ -73,6 +73,7 @@ export interface CreateCalendarEventInput {
   timezone: string;
   reminderMinutes?: number;
   transparency: "opaque" | "transparent";
+  recurrence?: string[];
   privateProperties: Record<string, string>;
 }
 
@@ -93,4 +94,5 @@ export interface CalendarGateway {
   createEvent(
     input: CreateCalendarEventInput
   ): Promise<Result<{ id: string; start: string; end: string }>>;
+  deleteEvent?(calendarId: string, eventId: string): Promise<Result<void>>;
 }
