@@ -109,7 +109,7 @@ Primary components:
 - **Content script:** safe metadata/readable-text extraction, content detection, selected-text capture, and save feedback.
 - **Popup:** non-persisting current-page preview, explicit save-for-later, duplicate status, Undo,
   queue navigation, and item-scoped planner handoff.
-- **Queue page:** search, filters, sorting, editing, bulk actions, import/export, and local statistics.
+- **Queue page:** quick URL capture, Daily Habits filter tab with count badges, multi-criteria sorting, search, ergonomic card actions (Read, Schedule, Done for today/Complete, More menu), bulk actions, decoupled data management (import/export), and reading statistics.
 - **Planner page:** candidate review, proposal editing, conflict checks, and explicit confirmation.
 - **Session page:** item opening, timer, completion, and end-of-session review.
 - **Options page:** Calendar connection, schedule preferences, privacy controls, diagnostics, import/export, and reset.

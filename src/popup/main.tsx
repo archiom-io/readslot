@@ -163,22 +163,33 @@ export const PopupApp = () => {
               borderTop: "1px solid #e5e7eb"
             }}
           >
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
-                cursor: "pointer",
-                fontSize: 13
+                justifyContent: "space-between",
+                gap: 8
               }}
             >
-              <input
-                type="checkbox"
-                aria-label="Set daily reminder"
-                checked={dailyReminder}
-                onChange={(e) => setDailyReminder(e.target.checked)}
-              />
-              <span>Remind me daily at</span>
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--ink)"
+                }}
+              >
+                <input
+                  type="checkbox"
+                  aria-label="Set daily reminder"
+                  checked={dailyReminder}
+                  onChange={(e) => setDailyReminder(e.target.checked)}
+                />
+                <span>Remind daily at</span>
+              </label>
               <input
                 type="time"
                 aria-label="Reminder time"
@@ -186,23 +197,24 @@ export const PopupApp = () => {
                 disabled={!dailyReminder}
                 onChange={(e) => setReminderTime(e.target.value)}
                 style={{
+                  width: "auto",
                   fontSize: 12,
-                  padding: "2px 4px",
-                  borderRadius: 4,
-                  border: "1px solid #ccc"
+                  padding: "3px 6px",
+                  borderRadius: 6,
+                  border: "1px solid var(--line)"
                 }}
               />
-            </label>
+            </div>
             {dailyReminder && (
               <label
                 style={{
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 6,
-                  marginTop: 6,
-                  marginLeft: 22,
+                  gap: 8,
+                  marginTop: 8,
+                  marginLeft: 24,
                   fontSize: 12,
-                  color: "#666",
+                  color: "var(--muted)",
                   cursor: "pointer"
                 }}
               >
