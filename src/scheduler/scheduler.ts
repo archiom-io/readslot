@@ -110,75 +110,97 @@ export const generateSuggestions = (input: SuggestionInput): Proposal[] => {
   for (let offset = 0; offset < settings.planningHorizonDays && proposals.length < 3; offset += 1) {
     const date = dateForOffset(startDate, offset);
     const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-    if (!settings.allowedWeekdays.includes(weekday)) continue;
 
-    const windowStart = fromZonedTime(
-      `${date}T${settings.earliestStart}:00`,
-      settings.timezone
-    ).getTime();
-    const windowEnd = fromZonedTime(
-      `${date}T${settings.latestEnd}:00`,
-      settings.timezone
-    ).getTime();
-    const slotDuration = duration * MINUTE;
-    let cursor = Math.max(windowStart, noticeBoundary);
-    cursor = Math.ceil(cursor / (15 * MINUTE)) * 15 * MINUTE;
+    const dayWindows =
+      settings.readingWindows && settings.readingWindows.length > 0
+        ? settings.readingWindows.filter((w) => w.enabled && w.days.includes(weekday))
+        : settings.allowedWeekdays.includes(weekday)
+          ? [
+              {
+                id: "default",
+                label: "Evening",
+                start: settings.earliestStart,
+                end: settings.latestEnd,
+                days: settings.allowedWeekdays,
+                enabled: true
+              }
+            ]
+          : [];
 
-    while (cursor + slotDuration <= windowEnd) {
-      const conflict = merged.find(
-        (interval) => cursor < interval.end && cursor + slotDuration > interval.start
-      );
-      if (conflict) {
-        cursor = Math.ceil(conflict.end / (15 * MINUTE)) * 15 * MINUTE;
-        continue;
+    if (dayWindows.length === 0) continue;
+
+    let dayBlocks = 0;
+    const maxDayBlocks = settings.maximumBlocksPerDay ?? 1;
+
+    for (const window of dayWindows) {
+      if (dayBlocks >= maxDayBlocks || proposals.length >= 3) break;
+
+      const windowStart = fromZonedTime(`${date}T${window.start}:00`, settings.timezone).getTime();
+      const windowEnd = fromZonedTime(`${date}T${window.end}:00`, settings.timezone).getTime();
+
+      if (windowEnd <= windowStart) continue;
+
+      const slotDuration = duration * MINUTE;
+      let cursor = Math.max(windowStart, noticeBoundary);
+      cursor = Math.ceil(cursor / (15 * MINUTE)) * 15 * MINUTE;
+
+      while (cursor + slotDuration <= windowEnd) {
+        const conflict = merged.find(
+          (interval) => cursor < interval.end && cursor + slotDuration > interval.start
+        );
+        if (conflict) {
+          cursor = Math.ceil(conflict.end / (15 * MINUTE)) * 15 * MINUTE;
+          continue;
+        }
+
+        const start = new Date(cursor).toISOString();
+        const end = new Date(cursor + slotDuration).toISOString();
+        const highPriorityCount = selected.filter((item) => item.priority === "high").length;
+        const ageDays = Math.max(
+          0,
+          (now.getTime() - new Date(selected[0].createdAt).getTime()) / 86_400_000
+        );
+        const durationFit =
+          15 *
+          (1 -
+            Math.min(
+              1,
+              Math.abs(duration - settings.preferredBlockMinutes) / settings.preferredBlockMinutes
+            ));
+        const score = 30 + 20 + highPriorityCount * 5 + Math.min(10, ageDays / 7) + durationFit;
+        proposals.push(
+          ProposalSchema.parse({
+            schemaVersion: SCHEMA_VERSION,
+            id: crypto.randomUUID(),
+            itemIds: selected.map((item) => item.id),
+            calendarId: settings.destinationCalendarId ?? "primary",
+            title: `ReadSlot — ${selected.length} ${selected.length === 1 ? "item" : "items"}`,
+            description: eventDescription(selected),
+            suggestedStart: start,
+            suggestedEnd: end,
+            durationMinutes: duration,
+            reminderMinutes: settings.defaultReminderMinutes,
+            score,
+            explanation: [
+              `Fits your "${window.label}" reading window (${settings.preferredBlockMinutes} min).`,
+              highPriorityCount > 0
+                ? `Includes ${highPriorityCount} high-priority item${highPriorityCount === 1 ? "" : "s"}.`
+                : "Prioritizes the oldest items in your queue.",
+              input.calendarConnected
+                ? `Leaves your configured calendar buffers intact.`
+                : "Calendar is not connected; availability is unverified."
+            ],
+            confidence: input.calendarConnected ? "high" : "low",
+            conflictStatus: input.calendarConnected ? "clear" : "unknown",
+            transparency: "opaque",
+            status: "ready",
+            generatedAt,
+            expiresAt
+          })
+        );
+        dayBlocks += 1;
+        break;
       }
-
-      const start = new Date(cursor).toISOString();
-      const end = new Date(cursor + slotDuration).toISOString();
-      const highPriorityCount = selected.filter((item) => item.priority === "high").length;
-      const ageDays = Math.max(
-        0,
-        (now.getTime() - new Date(selected[0].createdAt).getTime()) / 86_400_000
-      );
-      const durationFit =
-        15 *
-        (1 -
-          Math.min(
-            1,
-            Math.abs(duration - settings.preferredBlockMinutes) / settings.preferredBlockMinutes
-          ));
-      const score = 30 + 20 + highPriorityCount * 5 + Math.min(10, ageDays / 7) + durationFit;
-      proposals.push(
-        ProposalSchema.parse({
-          schemaVersion: SCHEMA_VERSION,
-          id: crypto.randomUUID(),
-          itemIds: selected.map((item) => item.id),
-          calendarId: settings.destinationCalendarId ?? "primary",
-          title: `ReadSlot — ${selected.length} ${selected.length === 1 ? "item" : "items"}`,
-          description: eventDescription(selected),
-          suggestedStart: start,
-          suggestedEnd: end,
-          durationMinutes: duration,
-          reminderMinutes: settings.defaultReminderMinutes,
-          score,
-          explanation: [
-            `Fits your preferred ${settings.preferredBlockMinutes}-minute window.`,
-            highPriorityCount > 0
-              ? `Includes ${highPriorityCount} high-priority item${highPriorityCount === 1 ? "" : "s"}.`
-              : "Prioritizes the oldest items in your queue.",
-            input.calendarConnected
-              ? `Leaves your configured calendar buffers intact.`
-              : "Calendar is not connected; availability is unverified."
-          ],
-          confidence: input.calendarConnected ? "high" : "low",
-          conflictStatus: input.calendarConnected ? "clear" : "unknown",
-          transparency: "opaque",
-          status: "ready",
-          generatedAt,
-          expiresAt
-        })
-      );
-      break;
     }
   }
 

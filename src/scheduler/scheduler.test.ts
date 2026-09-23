@@ -119,4 +119,42 @@ describe("generateSuggestions", () => {
     expect(proposals).toHaveLength(3);
     expect(proposals.every((proposal) => proposal.durationMinutes === 30)).toBe(true);
   });
+
+  it("schedules across multiple named reading windows with specific days and labels", () => {
+    const settings = {
+      ...createDefaultSettings(),
+      timezone: "UTC",
+      readingWindows: [
+        {
+          id: "morning",
+          label: "Morning Commute",
+          start: "08:00",
+          end: "09:00",
+          days: [1, 2, 3, 4, 5],
+          enabled: true
+        },
+        {
+          id: "lunch",
+          label: "Lunch Break",
+          start: "12:30",
+          end: "13:30",
+          days: [1, 2, 3, 4, 5],
+          enabled: true
+        }
+      ],
+      maximumBlocksPerDay: 2
+    };
+
+    const proposals = generateSuggestions({
+      items: [item],
+      busy: [],
+      settings,
+      now: new Date("2026-07-13T07:00:00.000Z"), // Monday 7am UTC
+      calendarConnected: true
+    });
+
+    expect(proposals.length).toBeGreaterThanOrEqual(2);
+    expect(proposals[0].explanation[0]).toContain("Morning Commute");
+    expect(proposals[1].explanation[0]).toContain("Lunch Break");
+  });
 });

@@ -1,7 +1,13 @@
 import { StrictMode, useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
+import { clsx } from "clsx";
 import { isWritableCalendar } from "../domain/calendar";
-import { SettingsSchema, type DailyHabitReminder, type Settings } from "../domain/schemas";
+import {
+  SettingsSchema,
+  type DailyHabitReminder,
+  type ReadingWindow,
+  type Settings
+} from "../domain/schemas";
 import type { CalendarSummary } from "../domain/ports";
 import { sendMessage } from "../shared/client";
 import { Notice, PageShell } from "../shared/ui";
@@ -10,6 +16,18 @@ interface CalendarStatus {
   configured: boolean;
   connected: boolean;
 }
+
+const DAYS: Array<{ day: number; label: string }> = [
+  { day: 1, label: "Mon" },
+  { day: 2, label: "Tue" },
+  { day: 3, label: "Wed" },
+  { day: 4, label: "Thu" },
+  { day: 5, label: "Fri" },
+  { day: 6, label: "Sat" },
+  { day: 0, label: "Sun" }
+];
+
+const DURATION_PRESETS = [10, 15, 20, 30, 45, 60];
 
 const App = () => {
   const [settings, setSettings] = useState<Settings>();
@@ -63,6 +81,80 @@ const App = () => {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (settings && window.location.hash === "#reading-windows") {
+      setTimeout(() => {
+        document.getElementById("reading-windows")?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
+    }
+  }, [settings]);
+
+  const currentWindows: ReadingWindow[] =
+    settings?.readingWindows && settings.readingWindows.length > 0
+      ? settings.readingWindows
+      : settings
+        ? [
+            {
+              id: "evening",
+              label: "Evening",
+              start: settings.earliestStart || "18:00",
+              end: settings.latestEnd || "21:00",
+              days: settings.allowedWeekdays || [1, 2, 3, 4, 5],
+              enabled: true
+            }
+          ]
+        : [];
+
+  const updateWindows = (newWindows: ReadingWindow[]) => {
+    if (!settings) return;
+    setSettings({
+      ...settings,
+      readingWindows: newWindows,
+      earliestStart: newWindows[0]?.start ?? settings.earliestStart,
+      latestEnd: newWindows[0]?.end ?? settings.latestEnd
+    });
+  };
+
+  const handleAddWindow = () => {
+    const newWindow: ReadingWindow = {
+      id: crypto.randomUUID(),
+      label: `Reading slot ${currentWindows.length + 1}`,
+      start: "12:30",
+      end: "13:15",
+      days: [1, 2, 3, 4, 5],
+      enabled: true
+    };
+    updateWindows([...currentWindows, newWindow]);
+  };
+
+  const handleRemoveWindow = (id: string) => {
+    if (currentWindows.length <= 1) return;
+    updateWindows(currentWindows.filter((w) => w.id !== id));
+  };
+
+  const handleUpdateWindow = (id: string, updates: Partial<ReadingWindow>) => {
+    updateWindows(currentWindows.map((w) => (w.id === id ? { ...w, ...updates } : w)));
+  };
+
+  const handleToggleDay = (id: string, day: number) => {
+    const target = currentWindows.find((w) => w.id === id);
+    if (!target) return;
+    const exists = target.days.includes(day);
+    if (exists && target.days.length === 1) return;
+    const nextDays = exists ? target.days.filter((d) => d !== day) : [...target.days, day].sort();
+    handleUpdateWindow(id, { days: nextDays });
+  };
+
+  const handleSetDayPreset = (id: string, preset: "weekdays" | "weekends" | "all") => {
+    const days =
+      preset === "weekdays"
+        ? [1, 2, 3, 4, 5]
+        : preset === "weekends"
+          ? [6, 0]
+          : [0, 1, 2, 3, 4, 5, 6];
+    handleUpdateWindow(id, { days });
+  };
 
   const connect = async () => {
     const result = await sendMessage({ type: "calendar.connect", payload: {} });
@@ -140,38 +232,167 @@ const App = () => {
       {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
       <div className="split">
         <form className="panel" onSubmit={(event) => void save(event)}>
-          <h2>Reading windows</h2>
+          <div id="reading-windows" style={{ marginBottom: 22 }}>
+            <div className="windows-section-header">
+              <div>
+                <h2 style={{ margin: 0 }}>Reading windows</h2>
+                <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13.5 }}>
+                  Configure when ReadSlot looks for reading time in your calendar.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button button-secondary"
+                style={{ padding: "6px 12px", fontSize: 13 }}
+                onClick={handleAddWindow}
+              >
+                + Add window
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              {currentWindows.map((win) => (
+                <div key={win.id} className={clsx("window-card", !win.enabled && "is-disabled")}>
+                  <div className="window-card-header">
+                    <div className="window-card-header-left">
+                      <input
+                        type="checkbox"
+                        checked={win.enabled}
+                        aria-label={`Enable ${win.label} window`}
+                        onChange={(e) => handleUpdateWindow(win.id, { enabled: e.target.checked })}
+                      />
+                      <input
+                        type="text"
+                        className="window-title-input"
+                        value={win.label}
+                        aria-label="Window label"
+                        placeholder="Window name"
+                        onChange={(e) => handleUpdateWindow(win.id, { label: e.target.value })}
+                      />
+                    </div>
+                    {currentWindows.length > 1 && (
+                      <button
+                        type="button"
+                        className="button-quiet"
+                        style={{ color: "var(--muted)", fontSize: 16 }}
+                        title="Delete window"
+                        aria-label={`Delete ${win.label} window`}
+                        onClick={() => handleRemoveWindow(win.id)}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="window-card-body">
+                    <div className="window-times-row">
+                      <input
+                        type="time"
+                        value={win.start}
+                        aria-label={`${win.label} start time`}
+                        onChange={(e) => handleUpdateWindow(win.id, { start: e.target.value })}
+                      />
+                      <span style={{ color: "var(--muted)", fontSize: 13 }}>to</span>
+                      <input
+                        type="time"
+                        value={win.end}
+                        aria-label={`${win.label} end time`}
+                        onChange={(e) => handleUpdateWindow(win.id, { end: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="day-selector-group">
+                      {DAYS.map(({ day, label }) => {
+                        const selected = win.days.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            className={clsx("day-pill", selected && "is-selected")}
+                            aria-pressed={selected}
+                            onClick={() => handleToggleDay(win.id, day)}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                      <span style={{ color: "var(--line)", margin: "0 2px" }}>|</span>
+                      <button
+                        type="button"
+                        className="day-quick-btn"
+                        onClick={() => handleSetDayPreset(win.id, "weekdays")}
+                      >
+                        Weekdays
+                      </button>
+                      <button
+                        type="button"
+                        className="day-quick-btn"
+                        onClick={() => handleSetDayPreset(win.id, "weekends")}
+                      >
+                        Weekends
+                      </button>
+                      <button
+                        type="button"
+                        className="day-quick-btn"
+                        onClick={() => handleSetDayPreset(win.id, "all")}
+                      >
+                        All
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontWeight: 750, fontSize: 15, display: "block", marginBottom: 4 }}>
+              Target reading block duration
+            </div>
+            <p style={{ margin: "0 0 10px", color: "var(--muted)", fontSize: 13.5 }}>
+              Choose your preferred session length, or specify custom minutes.
+            </p>
+            <div className="duration-chips">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={clsx(
+                    "duration-chip",
+                    settings.preferredBlockMinutes === preset && "is-active"
+                  )}
+                  onClick={() => setSettings({ ...settings, preferredBlockMinutes: preset })}
+                >
+                  {preset} min
+                </button>
+              ))}
+              <div className="custom-duration-container">
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>Custom:</span>
+                <input
+                  type="number"
+                  min="5"
+                  max="1440"
+                  className="custom-duration-input"
+                  aria-label="Custom target duration in minutes"
+                  value={
+                    !DURATION_PRESETS.includes(settings.preferredBlockMinutes)
+                      ? settings.preferredBlockMinutes
+                      : ""
+                  }
+                  placeholder="min"
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val >= 5 && val <= 1440) {
+                      setSettings({ ...settings, preferredBlockMinutes: val });
+                    }
+                  }}
+                />
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>min</span>
+              </div>
+            </div>
+          </div>
+
           <div className="form-grid">
-            <label>
-              Earliest start
-              <input
-                type="time"
-                value={settings.earliestStart}
-                onChange={(event) =>
-                  setSettings({ ...settings, earliestStart: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              Latest end
-              <input
-                type="time"
-                value={settings.latestEnd}
-                onChange={(event) => setSettings({ ...settings, latestEnd: event.target.value })}
-              />
-            </label>
-            <label>
-              Preferred block (minutes)
-              <input
-                type="number"
-                min="5"
-                max="1440"
-                value={settings.preferredBlockMinutes}
-                onChange={(event) =>
-                  setSettings({ ...settings, preferredBlockMinutes: Number(event.target.value) })
-                }
-              />
-            </label>
             <label>
               Minimum block (minutes)
               <input

@@ -1,8 +1,9 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { clsx } from "clsx";
 import { z } from "zod";
 import { ProposalSchema, type Proposal } from "../domain/schemas";
-import { sendMessage } from "../shared/client";
+import { extensionUrl, sendMessage } from "../shared/client";
 import { EmptyState, Notice, PageShell, formatDateTime, formatMinutes } from "../shared/ui";
 
 interface CalendarStatus {
@@ -165,13 +166,22 @@ export const PlannerApp = () => {
       eyebrow="Calendar planner"
       title="Choose the time."
       actions={
-        <button
-          className="button button-primary"
-          disabled={loading}
-          onClick={() => void generate()}
-        >
-          {loading ? "Checking…" : "Find reading times"}
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <a
+            className="button button-secondary"
+            href={`${extensionUrl("options.html")}#reading-windows`}
+            title="Configure reading windows and block durations"
+          >
+            ⚙️ Reading windows
+          </a>
+          <button
+            className="button button-primary"
+            disabled={loading}
+            onClick={() => void generate()}
+          >
+            {loading ? "Checking…" : "Find reading times"}
+          </button>
+        </div>
       }
     >
       {!status.configured && (
@@ -211,7 +221,25 @@ export const PlannerApp = () => {
 
       {proposals.length === 0 ? (
         <EmptyState title="No active suggestions">
-          Choose “Find reading times” to turn your queued items into editable proposals.
+          <p style={{ margin: "0 0 14px" }}>
+            Choose “Find reading times” to turn your queued items into editable proposals, or
+            customize your reading windows to fit your schedule.
+          </p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              className="button button-primary"
+              disabled={loading}
+              onClick={() => void generate()}
+            >
+              {loading ? "Checking…" : "Find reading times"}
+            </button>
+            <a
+              className="button button-secondary"
+              href={`${extensionUrl("options.html")}#reading-windows`}
+            >
+              ⚙️ Configure reading windows
+            </a>
+          </div>
         </EmptyState>
       ) : (
         <div className="grid grid-2">
@@ -252,19 +280,49 @@ export const PlannerApp = () => {
                     onChange={(event) => updateStart(proposal, event.target.value)}
                   />
                 </label>
-                <label>
-                  Duration
-                  <select
-                    value={proposal.durationMinutes}
-                    onChange={(event) => updateDuration(proposal, Number(event.target.value))}
-                  >
-                    {[15, 30, 45, 60, 90].map((minutes) => (
-                      <option key={minutes} value={minutes}>
-                        {minutes} minutes
-                      </option>
+                <div className="wide">
+                  <div style={{ fontWeight: 700, display: "block", marginBottom: 6 }}>
+                    Slot duration
+                  </div>
+                  <div className="duration-chips">
+                    {[10, 15, 20, 30, 45, 60].map((minutes) => (
+                      <button
+                        key={minutes}
+                        type="button"
+                        className={clsx(
+                          "duration-chip",
+                          proposal.durationMinutes === minutes && "is-active"
+                        )}
+                        onClick={() => updateDuration(proposal, minutes)}
+                      >
+                        {minutes} min
+                      </button>
                     ))}
-                  </select>
-                </label>
+                    <div className="custom-duration-container">
+                      <span style={{ fontSize: 13, color: "var(--muted)" }}>Custom:</span>
+                      <input
+                        type="number"
+                        min="5"
+                        max="1440"
+                        className="custom-duration-input"
+                        aria-label="Custom duration in minutes"
+                        value={
+                          ![10, 15, 20, 30, 45, 60].includes(proposal.durationMinutes)
+                            ? proposal.durationMinutes
+                            : ""
+                        }
+                        placeholder="min"
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val >= 5 && val <= 1440) {
+                            updateDuration(proposal, val);
+                          }
+                        }}
+                      />
+                      <span style={{ fontSize: 13, color: "var(--muted)" }}>min</span>
+                    </div>
+                  </div>
+                </div>
                 <label className="wide">
                   Event title
                   <input

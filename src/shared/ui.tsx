@@ -124,6 +124,6 @@ export const EmptyState = ({ title, children }: PropsWithChildren<{ title: strin
   <div className="empty-state">
     <span aria-hidden="true">◌</span>
     <h2>{title}</h2>
-    <p>{children}</p>
+    <div className="empty-state-body">{children}</div>
   </div>
 );

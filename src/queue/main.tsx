@@ -52,7 +52,6 @@ const isDoneToday = (item: ReadingItem): boolean => {
 };
 
 export const QueueApp = () => {
-  const [items, setItems] = useState<ReadingItem[]>([]);
   const [allItems, setAllItems] = useState<ReadingItem[]>([]);
   const [stats, setStats] = useState<Stats>();
   const [view, setView] = useState<View>("queued");
@@ -90,43 +89,29 @@ export const QueueApp = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const load = async () => {
-    setLoading(true);
-    const [itemResult, statsResult, allResult] = await Promise.all([
-      sendMessage<ReadingItem[]>({
-        type: "items.list",
-        payload: {
-          status: view === "all" || view === "daily" ? undefined : view,
-          search,
-          includeDeleted: view === "deleted"
-        }
-      }),
-      sendMessage<Stats>({ type: "dashboard.stats", payload: {} }),
+  const load = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    const [allResult, statsResult] = await Promise.all([
       sendMessage<ReadingItem[]>({
         type: "items.list",
         payload: { includeDeleted: true }
-      })
+      }),
+      sendMessage<Stats>({ type: "dashboard.stats", payload: {} })
     ]);
 
-    if (itemResult.ok) {
-      if (view === "daily") {
-        setItems(itemResult.value.filter((item) => item.recurrence?.enabled));
-      } else {
-        setItems(itemResult.value);
-      }
+    if (allResult.ok) {
+      setAllItems(allResult.value);
     } else {
-      setNotice({ tone: "danger", text: itemResult.error.message });
+      setNotice({ tone: "danger", text: allResult.error.message });
     }
 
-    if (allResult.ok) setAllItems(allResult.value);
     if (statsResult.ok) setStats(statsResult.value);
     setLoading(false);
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => void load(), 120);
-    return () => clearTimeout(timer);
-  }, [view, search]);
+    void load(true);
+  }, []);
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -152,9 +137,36 @@ export const QueueApp = () => {
     [dailyHabits]
   );
 
-  // Sorted items
-  const sortedItems = useMemo(() => {
-    const list = [...items];
+  // Filtered & sorted items
+  const displayedItems = useMemo(() => {
+    let list = [...allItems];
+    if (view === "daily") {
+      list = list.filter((i) => i.status !== "deleted" && i.recurrence?.enabled);
+    } else if (view === "deleted") {
+      list = list.filter((i) => i.status === "deleted");
+    } else if (view !== "all") {
+      list = list.filter((i) => i.status === view);
+    } else {
+      list = list.filter((i) => i.status !== "deleted");
+    }
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((item) =>
+        [
+          item.title,
+          item.originalUrl,
+          item.domain,
+          item.notes ?? "",
+          item.collectionId ?? "",
+          ...item.tags
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
     switch (sort) {
       case "oldest":
         return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -176,11 +188,11 @@ export const QueueApp = () => {
       default:
         return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
-  }, [items, sort]);
+  }, [allItems, view, search, sort]);
 
   const selectedItems = useMemo(
-    () => items.filter((item) => selected.has(item.id)),
-    [items, selected]
+    () => displayedItems.filter((item) => selected.has(item.id)),
+    [displayedItems, selected]
   );
 
   const handleAdd = async (event: FormEvent) => {
@@ -360,6 +372,13 @@ export const QueueApp = () => {
       title="Make later happen."
       actions={
         <>
+          <a
+            className="button button-secondary"
+            href={`${extensionUrl("options.html")}#reading-windows`}
+            title="Configure reading windows and block durations"
+          >
+            ⚙️ Reading windows
+          </a>
           <a className="button button-primary" href={extensionUrl("planner.html")}>
             Plan reading time
           </a>
@@ -503,34 +522,36 @@ export const QueueApp = () => {
         </div>
 
         <div className="queue-filter-row">
-          <label className="search" style={{ flex: 1, minWidth: 260 }}>
-            Search queue
+          <div className="search-bar-container">
+            <span className="search-icon" aria-hidden="true">
+              🔍
+            </span>
             <input
               type="search"
+              className="search-input"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Filter by title, URL, tag, note…"
+              placeholder="Search queue by title, URL, tag, note…"
+              aria-label="Search queue"
             />
-          </label>
-          <div className="queue-search-sort">
-            <select
-              className="sort-select"
-              value={sort}
-              aria-label="Sort queue items"
-              onChange={(event) => setSort(event.target.value as SortOption)}
-            >
-              <option value="newest">Sort: Newest first</option>
-              <option value="oldest">Sort: Oldest first</option>
-              <option value="shortest">Sort: Shortest read</option>
-              <option value="longest">Sort: Longest read</option>
-              <option value="priority">Sort: Priority</option>
-            </select>
           </div>
+          <select
+            className="sort-select"
+            value={sort}
+            aria-label="Sort queue items"
+            onChange={(event) => setSort(event.target.value as SortOption)}
+          >
+            <option value="newest">Sort: Newest first</option>
+            <option value="oldest">Sort: Oldest first</option>
+            <option value="shortest">Sort: Shortest read</option>
+            <option value="longest">Sort: Longest read</option>
+            <option value="priority">Sort: Priority</option>
+          </select>
         </div>
 
         {loading ? (
           <Notice>Loading your local queue…</Notice>
-        ) : sortedItems.length === 0 ? (
+        ) : displayedItems.length === 0 ? (
           <EmptyState
             title={
               view === "daily"
@@ -546,7 +567,7 @@ export const QueueApp = () => {
           </EmptyState>
         ) : (
           <ul className="item-list" id="items-heading" style={{ marginTop: 16 }}>
-            {sortedItems.map((item) => {
+            {displayedItems.map((item) => {
               const isRecurring = Boolean(item.recurrence?.enabled);
               const doneToday = isRecurring && isDoneToday(item);
               const isMenuOpen = activeMenuId === item.id;

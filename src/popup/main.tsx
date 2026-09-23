@@ -33,7 +33,10 @@ export const PopupApp = () => {
     void loadPreview();
   }, []);
 
-  const openPage = async (page: "queue.html" | "planner.html", itemId?: string): Promise<void> => {
+  const openPage = async (
+    page: "queue.html" | "planner.html" | "session.html" | "options.html",
+    itemId?: string
+  ): Promise<void> => {
     const result = await sendMessage<void>({
       type: "navigation.open",
       payload: { page, itemId }
@@ -274,7 +277,26 @@ export const PopupApp = () => {
           </button>
         </section>
       )}
-      <p className="popup-footer subtle">Nothing is booked without your confirmation.</p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 8
+        }}
+      >
+        <p className="popup-footer subtle" style={{ margin: 0 }}>
+          Nothing is booked without your confirmation.
+        </p>
+        <button
+          className="button button-quiet"
+          style={{ fontSize: 11, padding: "2px 6px" }}
+          onClick={() => void openPage("options.html")}
+          title="Configure reading windows and settings"
+        >
+          ⚙️ Windows
+        </button>
+      </div>
     </main>
   );
 };

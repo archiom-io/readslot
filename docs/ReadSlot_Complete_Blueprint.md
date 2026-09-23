@@ -575,12 +575,10 @@ Default:
 
 ## User settings
 
-- Allowed days
-- Earliest start time
-- Latest end time
+- Active reading windows (`readingWindows`: named slots such as Morning Commute, Lunch Break, Evening Wind-Down with start/end times, active day-of-week filters, and enabled toggles)
+- Target block duration (preset chips: 10, 15, 20, 30, 45, 60 min, plus custom minute input)
 - Minimum block length
 - Maximum block length
-- Preferred block length
 - Minimum notice
 - Planning horizon
 - Buffer before events
@@ -589,8 +587,7 @@ Default:
 - Preferred calendar
 - Time zone
 - Weekend preference
-- Deep-focus hours
-- Light-reading hours
+- Daily recurring habit reminders (`dailyReminders`)
 
 ## Suggestion output
 
@@ -602,7 +599,7 @@ Each suggestion includes:
 - Items included
 - Estimated total time
 - Remaining buffer
-- Explanation
+- Explanation (referencing the matched reading window, e.g. "Fits your Morning Commute reading window (30 min)")
 - Confidence
 - Conflict status
 - Calendar used
@@ -616,6 +613,7 @@ Example scoring:
 
 ## Explanation examples
 
+- "Fits your \"Morning Commute\" reading window (30 min)."
 - "Fits your preferred 45-minute weekday window."
 - "Includes your two oldest high-priority items."
 - "Leaves a 15-minute buffer before your next meeting."
@@ -638,7 +636,7 @@ Only a click on a clearly labeled action such as **Create reading block** may cr
 - Date
 - Start time
 - End time
-- Duration
+- Duration (via fast 1-click preset chips `10m`, `15m`, `20m`, `30m`, `45m`, `60m` and custom minute entry)
 - Reminder
 - Calendar
 - Items
@@ -1425,6 +1423,19 @@ export interface ReadingSession {
 }
 ```
 
+## ReadingWindow
+
+```ts
+export interface ReadingWindow {
+  id: string;
+  label: string;
+  start: string;
+  end: string;
+  days: number[];
+  enabled: boolean;
+}
+```
+
 ## Settings
 
 ```ts
@@ -1433,6 +1444,7 @@ export interface Settings {
   readingSpeedWpm: number;
   defaultUnknownMinutes: number;
   allowedWeekdays: number[];
+  readingWindows: ReadingWindow[];
   earliestStart: string;
   latestEnd: string;
   minimumBlockMinutes: number;
@@ -1448,6 +1460,12 @@ export interface Settings {
   timezone: string;
   defaultReminderMinutes?: number;
   allowConflicts: boolean;
+  ignoreAllDayEvents: boolean;
+  respectDeclinedEvents: boolean;
+  treatTentativeAsBusy: boolean;
+  weeklyPlanningNotification: boolean;
+  dailyReminders: DailyHabitReminder[];
+  privacyMode: boolean;
 }
 ```
 

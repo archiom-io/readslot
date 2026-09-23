@@ -34,8 +34,10 @@ store assets, release scripts, and project documentation. `ReadSlot_Complete_Blu
 the full product specification; this file records the implemented baseline.
 
 The clean TypeScript foundation is settled in ADR 0001. The upstream source was not imported
-wholesale. The remaining external checkpoint is a Chrome Extension OAuth client ID for real
-Calendar verification; production packaging also requires the Store extension's OAuth client ID.
+wholesale. Daily recurring habit and item reminders are settled in ADR 0005. Multi-window reading
+schedules, duration presets, and UI ergonomics are settled in ADR 0006. The remaining external
+checkpoint is a Chrome Extension OAuth client ID for real Calendar verification; production
+packaging also requires the Store extension's OAuth client ID.
 
 ## 4. Decision hierarchy
 
@@ -108,11 +110,11 @@ Primary components:
 - **Background service worker:** message routing, storage orchestration, OAuth, Calendar API calls, proposal generation, alarms, migrations, and idempotent event creation.
 - **Content script:** safe metadata/readable-text extraction, content detection, selected-text capture, and save feedback.
 - **Popup:** non-persisting current-page preview, explicit save-for-later, duplicate status, Undo,
-  queue navigation, and item-scoped planner handoff.
-- **Queue page:** quick URL capture, Daily Habits filter tab with count badges, multi-criteria sorting, search, ergonomic card actions (Read, Schedule, Done for today/Complete, More menu), bulk actions, decoupled data management (import/export), and reading statistics.
-- **Planner page:** candidate review, proposal editing, conflict checks, and explicit confirmation.
+  queue navigation, item-scoped planner handoff, and quick reading windows setup shortcut.
+- **Queue page:** quick URL capture, Reading windows setup CTA, Daily Habits filter tab with count badges, zero-flicker tab switching, multi-criteria sorting, search aligned horizontally with sort filter, normalized card heights, ergonomic card actions (Read, Schedule, Done for today/Complete, More menu), bulk actions, decoupled data management (import/export), and reading statistics.
+- **Planner page:** candidate review, duration preset chips (10m..60m) and custom minute entry on proposal cards, Reading windows setup CTAs in header and empty state, conflict checks, and explicit confirmation.
 - **Session page:** item opening, timer, completion, and end-of-session review.
-- **Options page:** Calendar connection, schedule preferences, privacy controls, diagnostics, import/export, and reset.
+- **Options page:** Calendar connection, multi-window reading schedule manager (with active day filters, add/edit/delete, and enabled toggles), target duration presets with custom minute entry, privacy controls, diagnostics, import/export, and reset.
 
 Keep domain logic independent of Chrome and Google APIs. Put browser storage, identity, and calendar calls behind typed adapters so scheduling and state transitions can be tested without an extension runtime.
 
@@ -147,7 +149,8 @@ Core entities:
 - **ReadingItem:** captured content, estimate, priority, tags, optional recurrence schedule, lifecycle timestamps, and local status.
 - **Proposal:** one or more item IDs plus a candidate time, score, explanation, expiry, and validation state.
 - **ReadingSession:** the link between selected items and one confirmed Calendar event.
-- **Settings:** schedule boundaries, duration preferences, calendars, timezone, reminders (including multiple daily habit reminders), and conflict policy.
+- **ReadingWindow:** named schedule slots (e.g. Morning Commute, Lunch Break, Evening Wind-Down) with start/end times, active day-of-week filters, and enabled toggles.
+- **Settings:** multi-window schedule boundaries (`readingWindows`), duration presets and custom limits, calendars, timezone, reminders (including multiple daily habit reminders), and conflict policy.
 
 Reading-item states:
 

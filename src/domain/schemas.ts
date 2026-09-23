@@ -123,13 +123,29 @@ export const ReadingSessionSchema = z.object({
   lastSyncedAt: IsoDateSchema
 });
 
+export const ReadingWindowSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1).max(50),
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  days: z.array(z.number().int().min(0).max(6)).min(1),
+  enabled: z.boolean().default(true)
+});
+
 export const SettingsSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   readingSpeedWpm: z.number().int().min(50).max(1_000),
   defaultUnknownMinutes: z.number().int().min(5).max(480),
   allowedWeekdays: z.array(z.number().int().min(0).max(6)).min(1),
-  earliestStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  latestEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  readingWindows: z.array(ReadingWindowSchema).default([]),
+  earliestStart: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .default("18:00"),
+  latestEnd: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .default("21:00"),
   minimumBlockMinutes: z.number().int().min(5).max(1_440),
   preferredBlockMinutes: z.number().int().min(5).max(1_440),
   maximumBlockMinutes: z.number().int().min(5).max(1_440),
@@ -182,6 +198,7 @@ export type DailyHabitReminder = z.infer<typeof DailyHabitReminderSchema>;
 export type ReadingItem = z.infer<typeof ReadingItemSchema>;
 export type Proposal = z.infer<typeof ProposalSchema>;
 export type ReadingSession = z.infer<typeof ReadingSessionSchema>;
+export type ReadingWindow = z.infer<typeof ReadingWindowSchema>;
 export type Settings = z.infer<typeof SettingsSchema>;
 export type CalendarOperation = z.infer<typeof CalendarOperationSchema>;
 export type Backup = z.infer<typeof BackupSchema>;
