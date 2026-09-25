@@ -26,6 +26,13 @@ explainable reading-slot suggestions around your existing Google Calendar commit
 - Finish, skip, or return unfinished reading to your queue.
 - Export your data or delete it from the extension at any time.
 
+### What's new in v0.10.0
+
+- Multi-window reading schedules: Configure distinct slots (e.g., Morning commute, Lunch break, Evening wind-down) with active day-of-week filters.
+- Flexible duration blocks: Choose 1-click duration presets (10m, 15m, 20m, 30m, 45m, 60m) or enter custom minutes directly when planning.
+- Daily habit reminders: Track recurring reading habits with queue badges and configurable local browser alarms.
+- Smoother queue workflow: Instant zero-flicker tab switching, aligned search/sort toolbar, and quick-setup shortcuts across the app.
+
 Your reading queue stays in your browser. ReadSlot has no backend, advertising, analytics, or
 automatic booking. Google Calendar access is optional and can be disconnected and revoked.
 
