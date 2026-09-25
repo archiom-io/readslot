@@ -14,8 +14,9 @@ This is ReadSlot's canonical product and engineering specification.
 
 # 0. Executive Decision Summary
 
-**Implementation status (2026-07-13):** The version 0.9.0 Chrome-first beta is implemented with
+**Implementation status (2026-09-25):** The version 0.10.0 Chrome-first release is implemented with
 a clean TypeScript foundation, on-demand `activeTab` capture, explicit Calendar confirmation,
+multi-window reading schedules, flexible duration blocks, daily habit reminders,
 local imports/exports, automated tests, release tooling, and store assets. Real OAuth smoke tests
 and the production package require environment-specific Chrome Extension OAuth client IDs.
 
@@ -2800,6 +2801,7 @@ Examples:
 - `0.1.0`: internal prototype
 - `0.5.0`: private beta
 - `0.9.0`: public beta
+- `0.10.0`: multi-window reading schedule & duration blocks release
 - `1.0.0`: stable
 
 Chrome manifest version must contain one to four dot-separated integers.
