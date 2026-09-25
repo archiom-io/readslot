@@ -5,7 +5,7 @@ Read `docs/PROJECT_KNOWLEDGE.md` and the relevant section of
 
 ## Current state
 
-The repository contains the version 0.9.0 beta implementation. Real Google Calendar verification
+The repository contains the version 0.10.0 implementation. Real Google Calendar verification
 and the production release ZIP remain blocked on environment-specific Chrome Extension OAuth
 client IDs. Do not add placeholder credentials to tracked files or weaken release validation.
 

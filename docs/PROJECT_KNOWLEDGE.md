@@ -2,7 +2,7 @@
 
 **Purpose:** Living context for maintainers, contributors, and coding agents  
 **Last updated:** 2026-07-17
-**Current phase:** Version 0.9.0 beta implementation; real OAuth verification and final release packaging pending
+**Current phase:** Version 0.10.0 release; real OAuth verification and final release packaging pending
 
 ## 1. Project identity
 

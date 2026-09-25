@@ -1,6 +1,6 @@
 {
   "name": "readslot",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Private reading queue and user-confirmed Google Calendar scheduler.",
   "private": true,
   "type": "module",

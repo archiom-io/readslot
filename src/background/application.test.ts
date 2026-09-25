@@ -128,7 +128,7 @@ beforeEach(async () => {
       create: vi.fn(async () => undefined),
       clear: vi.fn(async () => undefined)
     },
-    runtime: { getManifest: vi.fn(() => ({ version: "0.9.0" })) }
+    runtime: { getManifest: vi.fn(() => ({ version: "0.10.0" })) }
   });
   calendarMocks.getBusy.mockResolvedValue(ok([]));
   calendarMocks.listCalendars.mockResolvedValue(
