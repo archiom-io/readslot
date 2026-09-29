@@ -144,7 +144,19 @@ export class CaptureService {
           return restored.ok ? ok({ item: restored.value, duplicate: false }) : restored;
         }
         if (recurrence) {
-          const updated = await this.items.update(existing.value.id, { recurrence });
+          if (!["queued", "proposed"].includes(existing.value.status)) {
+            return err({
+              code: "CONFLICT",
+              message: "Open the queue to change reminders for this item in its current state."
+            });
+          }
+          const updated = await this.items.update(existing.value.id, {
+            recurrence: {
+              ...recurrence,
+              calendarEventId: existing.value.recurrence?.calendarEventId,
+              calendarId: existing.value.recurrence?.calendarId
+            }
+          });
           if (updated.ok && updated.value.recurrence?.enabled) {
             await scheduleItemAlarm(updated.value);
           }
@@ -218,7 +230,7 @@ export class CaptureService {
         }
       });
     } catch {
-      await chrome.action.setBadgeText({ tabId, text: result.ok ? "✓" : "!" });
+      await chrome.action.setBadgeText({ tabId, text: result.ok ? "OK" : "!" });
       await chrome.action.setBadgeBackgroundColor({
         tabId,
         color: result.ok ? "#4d7c0f" : "#b91c1c"

@@ -9,6 +9,7 @@ import type {
   RecurrenceSchedule
 } from "../domain/schemas";
 import { extensionUrl, sendMessage } from "../shared/client";
+import { Icon } from "../shared/icons";
 import { EmptyState, Notice, PageShell, formatMinutes } from "../shared/ui";
 
 type View = "all" | "queued" | "daily" | "scheduled" | "completed" | "archived" | "deleted";
@@ -32,7 +33,7 @@ const priorityWeight: Record<Priority, number> = {
 
 const views: Array<{ value: View; label: string }> = [
   { value: "queued", label: "Inbox" },
-  { value: "daily", label: "Daily 🔁" },
+  { value: "daily", label: "Daily" },
   { value: "scheduled", label: "Scheduled" },
   { value: "all", label: "All" },
   { value: "completed", label: "Completed" },
@@ -377,7 +378,8 @@ export const QueueApp = () => {
             href={`${extensionUrl("options.html")}#reading-windows`}
             title="Configure reading windows and block durations"
           >
-            ⚙️ Reading windows
+            <Icon name="settings" />
+            Reading windows
           </a>
           <a className="button button-primary" href={extensionUrl("planner.html")}>
             Plan reading time
@@ -389,7 +391,8 @@ export const QueueApp = () => {
               aria-haspopup="true"
               aria-expanded={showDataMenu}
             >
-              Data &amp; Backups ▾
+              Data &amp; Backups
+              <Icon name="chevron-down" size={14} />
             </button>
             {showDataMenu && (
               <div className="header-data-dropdown" role="menu">
@@ -399,10 +402,12 @@ export const QueueApp = () => {
                   role="menuitem"
                   onClick={() => void exportBackup()}
                 >
-                  📥 Export JSON backup
+                  <Icon name="download" />
+                  Export JSON backup
                 </button>
                 <label className="data-menu-item">
-                  📤 Import JSON backup
+                  <Icon name="upload" />
+                  Import JSON backup
                   <input
                     type="file"
                     accept="application/json"
@@ -411,7 +416,8 @@ export const QueueApp = () => {
                   />
                 </label>
                 <label className="data-menu-item">
-                  📑 Import links (CSV, HTML, MD)
+                  <Icon name="file-import" />
+                  Import links (CSV, HTML, MD)
                   <input
                     type="file"
                     accept=".csv,.html,.htm,.md,.txt"
@@ -483,7 +489,7 @@ export const QueueApp = () => {
       <section className="panel quick-add-panel" style={{ marginTop: 22 }}>
         <form className="quick-add-form" onSubmit={(event) => void handleAdd(event)}>
           <span className="quick-add-icon" aria-hidden="true">
-            🔗
+            <Icon name="link" size={18} />
           </span>
           <input
             type="url"
@@ -514,6 +520,7 @@ export const QueueApp = () => {
                   setSelected(new Set());
                 }}
               >
+                {entry.value === "daily" && <Icon name="repeat" size={14} />}
                 {entry.label}
                 {typeof count === "number" && <span className="tab-badge">{count}</span>}
               </button>
@@ -524,7 +531,7 @@ export const QueueApp = () => {
         <div className="queue-filter-row">
           <div className="search-bar-container">
             <span className="search-icon" aria-hidden="true">
-              🔍
+              <Icon name="search" size={15} />
             </span>
             <input
               type="search"
@@ -614,10 +621,16 @@ export const QueueApp = () => {
                           className="pill"
                           style={{ backgroundColor: "#e0f2fe", color: "#0369a1", fontWeight: 700 }}
                         >
-                          🔁 Daily @ {item.recurrence?.time}
+                          <Icon name="repeat" size={13} />
+                          Daily @ {item.recurrence?.time}
                         </span>
                       )}
-                      {doneToday && <span className="pill pill-success">✓ Done today</span>}
+                      {doneToday && (
+                        <span className="pill pill-success">
+                          <Icon name="check" size={13} />
+                          Done today
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -631,7 +644,8 @@ export const QueueApp = () => {
                         void update(item.id, { lastOpenedAt: new Date().toISOString() })
                       }
                     >
-                      Read ↗
+                      Read
+                      <Icon name="external-link" size={14} />
                     </a>
 
                     <a
@@ -639,7 +653,8 @@ export const QueueApp = () => {
                       href={`${extensionUrl("planner.html")}?itemId=${item.id}`}
                       title="Schedule reading block in Calendar"
                     >
-                      📅 Schedule
+                      <Icon name="calendar" size={14} />
+                      Schedule
                     </a>
 
                     {item.status === "deleted" ? (
@@ -654,14 +669,22 @@ export const QueueApp = () => {
                         className={clsx("button-complete", doneToday && "is-done")}
                         onClick={() => void handleToggleDailyDone(item)}
                       >
-                        {doneToday ? "✓ Done for today" : "Done for today"}
+                        {doneToday && <Icon name="check" size={14} />}
+                        Done for today
                       </button>
                     ) : (
                       <button
                         className="button-complete"
                         onClick={() => void handleToggleComplete(item)}
                       >
-                        {item.status === "completed" ? "Mark unread" : "Complete ✓"}
+                        {item.status === "completed" ? (
+                          "Mark unread"
+                        ) : (
+                          <>
+                            <Icon name="check" size={14} />
+                            Complete
+                          </>
+                        )}
                       </button>
                     )}
 
@@ -674,7 +697,7 @@ export const QueueApp = () => {
                         aria-expanded={isMenuOpen}
                         onClick={() => setActiveMenuId(isMenuOpen ? null : item.id)}
                       >
-                        ⋯
+                        <Icon name="more-horizontal" size={18} />
                       </button>
 
                       {isMenuOpen && (
@@ -716,8 +739,17 @@ export const QueueApp = () => {
                               setActiveMenuId(null);
                             }}
                           >
-                            <span>⏰ Daily reminder</span>
-                            <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                            <span className="menu-item-label">
+                              <Icon name="bell" size={15} />
+                              Daily reminder
+                            </span>
+                            <span
+                              style={{
+                                marginLeft: "auto",
+                                fontSize: 11,
+                                color: "var(--muted)"
+                              }}
+                            >
                               {item.recurrence?.enabled ? item.recurrence.time : "Off"}
                             </span>
                           </button>
@@ -730,6 +762,7 @@ export const QueueApp = () => {
                               role="menuitem"
                               onClick={() => void remove(item.id, true)}
                             >
+                              <Icon name="trash" size={15} />
                               Delete forever
                             </button>
                           ) : (
@@ -742,14 +775,16 @@ export const QueueApp = () => {
                                   setActiveMenuId(null);
                                 }}
                               >
-                                📦 Archive
+                                <Icon name="archive" size={15} />
+                                Archive
                               </button>
                               <button
                                 className="more-menu-item danger"
                                 role="menuitem"
                                 onClick={() => void remove(item.id)}
                               >
-                                🗑️ Move to trash
+                                <Icon name="trash" size={15} />
+                                Move to trash
                               </button>
                             </>
                           )}
@@ -768,13 +803,16 @@ export const QueueApp = () => {
         <div className="floating-bulk-bar" role="toolbar" aria-label="Bulk actions">
           <span style={{ fontWeight: 700, fontSize: 13 }}>{selected.size} selected</span>
           <button className="button button-secondary" onClick={() => void bulkStatus("proposed")}>
-            📅 Plan reading time
+            <Icon name="calendar" />
+            Plan reading time
           </button>
           <button className="button button-secondary" onClick={() => void bulkStatus("archived")}>
-            📦 Archive
+            <Icon name="archive" />
+            Archive
           </button>
           <button className="button button-danger" onClick={() => void bulkStatus("deleted")}>
-            🗑️ Move to trash
+            <Icon name="trash" />
+            Move to trash
           </button>
           <button
             className="button button-quiet"

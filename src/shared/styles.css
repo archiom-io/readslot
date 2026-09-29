@@ -24,6 +24,11 @@
 * {
   box-sizing: border-box;
 }
+.icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
 body {
   margin: 0;
   min-width: 320px;
@@ -261,6 +266,9 @@ h3 {
   width: fit-content;
 }
 .tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0;
   color: var(--muted);
   background: transparent;
@@ -345,6 +353,7 @@ textarea {
 .pill {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   width: fit-content;
   white-space: nowrap;
   padding: 4px 8px;
@@ -461,6 +470,53 @@ textarea {
 .popup-card .meta {
   margin-bottom: 16px;
 }
+.popup-calendar-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 12px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #faf9ff;
+}
+.popup-calendar-copy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.popup-calendar-copy .icon {
+  flex: 0 0 auto;
+  color: var(--purple);
+}
+.popup-calendar-copy div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.popup-calendar-copy strong {
+  font-size: 12px;
+}
+.popup-calendar-copy span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.popup-calendar-button {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.popup-reminder-summary {
+  margin: 8px 0 0 24px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
 .popup-actions {
   display: grid;
   gap: 9px;
@@ -483,8 +539,7 @@ textarea {
   padding: 64px 20px;
   color: var(--muted);
 }
-.empty-state > span {
-  font-size: 58px;
+.empty-state > .icon {
   color: #aa9fee;
 }
 .empty-state h2 {
@@ -749,7 +804,7 @@ textarea {
 .more-menu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   padding: 7px 10px;
   font-size: 13px;
@@ -761,6 +816,11 @@ textarea {
   cursor: pointer;
   text-align: left;
   width: 100%;
+}
+.menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .more-menu-item:hover {
   background: #f4f3fa;

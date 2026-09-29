@@ -34,6 +34,24 @@ interface GoogleErrorPayload {
   };
 }
 
+const eventRequestBody = (input: CreateCalendarEventInput, includeId = true) => ({
+  ...(includeId ? { id: input.eventId } : {}),
+  summary: input.title,
+  description: input.description,
+  start: { dateTime: input.start, timeZone: input.timezone },
+  end: { dateTime: input.end, timeZone: input.timezone },
+  transparency: input.transparency,
+  ...(input.recurrence ? { recurrence: input.recurrence } : {}),
+  reminders:
+    input.reminderMinutes === undefined
+      ? { useDefault: false }
+      : {
+          useDefault: false,
+          overrides: [{ method: "popup", minutes: input.reminderMinutes }]
+        },
+  extendedProperties: { private: input.privateProperties }
+});
+
 const buildForbiddenContext = (
   path: string,
   response: Response,
@@ -126,8 +144,15 @@ export class GoogleCalendarGateway implements CalendarGateway {
       this.tokenState = { token: response.token };
       if (interactive) await chrome.storage.local.remove(DISCONNECTED_KEY);
       return ok(undefined);
-    } catch {
-      return err({ code: "OAUTH_DENIED", message: "Google sign-in was cancelled or denied." });
+    } catch (error) {
+      const identityMessage = error instanceof Error ? error.message.trim().slice(0, 240) : "";
+      return err({
+        code: "OAUTH_DENIED",
+        message: identityMessage
+          ? `Google sign-in failed: ${identityMessage}`
+          : "Google sign-in was cancelled or denied.",
+        context: identityMessage ? { identityMessage } : undefined
+      });
     }
   }
 
@@ -308,23 +333,33 @@ export class GoogleCalendarGateway implements CalendarGateway {
       },
       {
         method: "POST",
-        body: JSON.stringify({
-          id: input.eventId,
-          summary: input.title,
-          description: input.description,
-          start: { dateTime: input.start, timeZone: input.timezone },
-          end: { dateTime: input.end, timeZone: input.timezone },
-          transparency: input.transparency,
-          ...(input.recurrence ? { recurrence: input.recurrence } : {}),
-          reminders:
-            input.reminderMinutes === undefined
-              ? { useDefault: false }
-              : {
-                  useDefault: false,
-                  overrides: [{ method: "popup", minutes: input.reminderMinutes }]
-                },
-          extendedProperties: { private: input.privateProperties }
-        })
+        body: JSON.stringify(eventRequestBody(input))
+      }
+    );
+    if (!response.ok) return response;
+    return ok({
+      id: response.value.id,
+      start: response.value.start.dateTime,
+      end: response.value.end.dateTime
+    });
+  }
+
+  async updateEvent(
+    input: CreateCalendarEventInput
+  ): Promise<Result<{ id: string; start: string; end: string }>> {
+    const response = await this.request<{
+      id: string;
+      start: { dateTime: string };
+      end: { dateTime: string };
+    }>(
+      `/calendars/${encodeURIComponent(input.calendarId)}/events/${encodeURIComponent(input.eventId)}`,
+      {
+        forbiddenCode: "CALENDAR_READ_ONLY",
+        forbiddenMessage: "The selected calendar is not writable."
+      },
+      {
+        method: "PATCH",
+        body: JSON.stringify(eventRequestBody(input, false))
       }
     );
     if (!response.ok) return response;

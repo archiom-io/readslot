@@ -18,3 +18,9 @@ ReadSlot users frequently save recurring reading material (e.g. daily newspapers
 
 3. **Queue Lifecycle for Recurring Items**:
    - When a user finishes reading a recurring item, session review records completion in session history and updates `lastOpenedAt`, but preserves the item in `queued` status so it remains active in the queue for future reminders without disappearing into completed archives.
+
+4. **Toolbar Confirmation and Calendar Connection**:
+   - Selecting a daily reminder replaces the one-time Save for later / Save & choose time choice with a single daily-reminder action.
+   - Local recurrence uses **Save daily reminder**. Calendar-backed recurrence uses **Confirm & sync daily**, which is available only after direct popup OAuth and writable-calendar validation.
+   - Google Calendar is mandatory only for Calendar-backed scheduling and sync. Capture, the local queue, and local notifications remain available without a Google account.
+   - Recurring Calendar creation uses a deterministic event ID, a persisted pending operation, timeout reconciliation, and removal of the linked event when the recurring item is undone or deleted.

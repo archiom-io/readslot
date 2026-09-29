@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   getNextOccurrence,
+  getNextOccurrenceInTimeZone,
   buildRRule,
   scheduleItemAlarm,
   scheduleHabitAlarm,
@@ -44,6 +45,30 @@ describe("reminders", () => {
       const next = getNextOccurrence("20:00", [3], now);
       const expected = new Date(2026, 8, 23, 20, 0, 0, 0).getTime();
       expect(next).toBe(expected);
+    });
+  });
+
+  describe("getNextOccurrenceInTimeZone", () => {
+    it("converts a fixed wall-clock time in a half-hour-offset timezone", () => {
+      const next = getNextOccurrenceInTimeZone(
+        "20:00",
+        [0, 1, 2, 3, 4, 5, 6],
+        "Asia/Kolkata",
+        new Date("2030-01-01T00:00:00.000Z")
+      );
+
+      expect(new Date(next).toISOString()).toBe("2030-01-01T14:30:00.000Z");
+    });
+
+    it("uses the post-transition offset across daylight-saving time", () => {
+      const next = getNextOccurrenceInTimeZone(
+        "09:00",
+        [0],
+        "America/New_York",
+        new Date("2026-03-07T15:00:00.000Z")
+      );
+
+      expect(new Date(next).toISOString()).toBe("2026-03-08T13:00:00.000Z");
     });
   });
 

@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import { z } from "zod";
 import { ProposalSchema, type Proposal } from "../domain/schemas";
 import { extensionUrl, sendMessage } from "../shared/client";
+import { Icon } from "../shared/icons";
 import { EmptyState, Notice, PageShell, formatDateTime, formatMinutes } from "../shared/ui";
 
 interface CalendarStatus {
@@ -172,7 +173,8 @@ export const PlannerApp = () => {
             href={`${extensionUrl("options.html")}#reading-windows`}
             title="Configure reading windows and block durations"
           >
-            ⚙️ Reading windows
+            <Icon name="settings" />
+            Reading windows
           </a>
           <button
             className="button button-primary"
@@ -237,7 +239,8 @@ export const PlannerApp = () => {
               className="button button-secondary"
               href={`${extensionUrl("options.html")}#reading-windows`}
             >
-              ⚙️ Configure reading windows
+              <Icon name="settings" />
+              Configure reading windows
             </a>
           </div>
         </EmptyState>

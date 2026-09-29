@@ -80,7 +80,7 @@ describe("QueueApp redesign", () => {
     expect(await screen.findByText("Item two")).toBeVisible();
 
     // Check ergonomic action buttons
-    const readButtons = screen.getAllByRole("link", { name: /read ↗/i });
+    const readButtons = screen.getAllByRole("link", { name: /^read$/i });
     expect(readButtons).toHaveLength(2);
 
     const scheduleButtons = screen.getAllByRole("link", { name: /schedule/i });
@@ -91,7 +91,7 @@ describe("QueueApp redesign", () => {
     );
 
     // One regular complete button and one done for today button
-    expect(screen.getByRole("button", { name: /complete ✓/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^complete$/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /done for today/i })).toBeVisible();
   });
 
@@ -99,7 +99,7 @@ describe("QueueApp redesign", () => {
     const user = userEvent.setup();
     render(<QueueApp />);
 
-    const dailyTab = await screen.findByRole("tab", { name: /daily 🔁/i });
+    const dailyTab = await screen.findByRole("tab", { name: /^daily/i });
     await user.click(dailyTab);
 
     await waitFor(() => {

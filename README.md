@@ -40,7 +40,10 @@ specification in
 
 Clicking the toolbar icon opens a page preview without saving it. Choose **Save for later** to add
 it to the local queue, or **Save & choose time** to continue with item-specific Calendar
-suggestions. Context-menu and keyboard captures remain immediate.
+suggestions. Selecting a daily reminder changes the action to **Save daily reminder** or
+**Confirm & sync daily**, and Google Calendar can be connected directly from the popup. Calendar
+remains optional for local saving and local reminders. Context-menu and keyboard captures remain
+immediate.
 
 ## Privacy and permissions
 

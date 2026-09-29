@@ -41,7 +41,8 @@ export const RecurrenceScheduleSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:mm"),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).default([0, 1, 2, 3, 4, 5, 6]),
   addToCalendar: z.boolean().default(false),
-  calendarEventId: z.string().optional()
+  calendarEventId: z.string().optional(),
+  calendarId: z.string().min(1).optional()
 });
 
 export const DailyHabitReminderSchema = z.object({
@@ -167,17 +168,28 @@ export const SettingsSchema = z.object({
   privacyMode: z.boolean()
 });
 
-export const CalendarOperationSchema = z.object({
-  schemaVersion: z.literal(SCHEMA_VERSION),
-  id: z.string().min(1),
-  proposalId: z.string().min(1),
-  deterministicEventId: z.string().min(5),
-  state: z.enum(["pending", "confirmed", "failed"]),
-  createdAt: IsoDateSchema,
-  updatedAt: IsoDateSchema,
-  eventId: z.string().optional(),
-  safeErrorCode: z.string().optional()
-});
+export const CalendarOperationSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    id: z.string().min(1),
+    operationKind: z.enum(["proposal", "recurrence"]).default("proposal"),
+    proposalId: z.string().min(1).optional(),
+    itemId: z.string().min(1).optional(),
+    deterministicEventId: z.string().min(5),
+    state: z.enum(["pending", "confirmed", "failed"]),
+    createdAt: IsoDateSchema,
+    updatedAt: IsoDateSchema,
+    eventId: z.string().optional(),
+    safeErrorCode: z.string().optional()
+  })
+  .superRefine((operation, context) => {
+    if (operation.operationKind === "proposal" && !operation.proposalId) {
+      context.addIssue({ code: "custom", message: "Proposal operations require a proposal ID." });
+    }
+    if (operation.operationKind === "recurrence" && !operation.itemId) {
+      context.addIssue({ code: "custom", message: "Recurrence operations require an item ID." });
+    }
+  });
 
 export const BackupSchema = z.object({
   kind: z.literal("readslot-backup"),

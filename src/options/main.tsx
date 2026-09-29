@@ -10,6 +10,7 @@ import {
 } from "../domain/schemas";
 import type { CalendarSummary } from "../domain/ports";
 import { sendMessage } from "../shared/client";
+import { Icon } from "../shared/icons";
 import { Notice, PageShell } from "../shared/ui";
 
 interface CalendarStatus {
@@ -279,7 +280,7 @@ const App = () => {
                         aria-label={`Delete ${win.label} window`}
                         onClick={() => handleRemoveWindow(win.id)}
                       >
-                        ✕
+                        <Icon name="x" size={17} />
                       </button>
                     )}
                   </div>

@@ -10,7 +10,9 @@ import {
   ReadingSessionSchema,
   SCHEMA_VERSION,
   SettingsSchema,
-  type Proposal
+  type Proposal,
+  type ReadingItem,
+  type Settings
 } from "../domain/schemas";
 import { generateSuggestions } from "../scheduler/scheduler";
 import {
@@ -31,9 +33,12 @@ import {
   buildRRule,
   clearHabitAlarm,
   clearItemAlarm,
+  getNextOccurrenceInTimeZone,
   scheduleHabitAlarm,
   scheduleItemAlarm
 } from "./reminders";
+import type { CreateCalendarEventInput } from "../domain/ports";
+import type { DomainError } from "../domain/result";
 
 const items = new DexieReadingRepository();
 const proposals = new DexieProposalRepository();
@@ -47,9 +52,9 @@ const confirming = new Set<string>();
 
 const escapeCsv = (value: string | number): string => `"${String(value).replaceAll('"', '""')}"`;
 
-const deterministicEventId = async (id: string): Promise<string> => {
+const deterministicEventId = async (id: string, namespace = "readslot"): Promise<string> => {
   const bytes = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`readslot:${id}`))
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${namespace}:${id}`))
   );
   const alphabet = "0123456789abcdefghijklmnopqrstuv";
   let bits = "";
@@ -58,6 +63,154 @@ const deterministicEventId = async (id: string): Promise<string> => {
   for (let index = 0; index + 5 <= bits.length; index += 5)
     encoded += alphabet[Number.parseInt(bits.slice(index, index + 5), 2)];
   return `readslot${encoded.slice(0, 47)}`;
+};
+
+type CaptureCalendarSync =
+  | { status: "not_requested" }
+  | { status: "synced"; calendarId: string; eventId: string }
+  | { status: "failed"; error: DomainError };
+
+const destinationCalendar = async (currentSettings: Settings, requestedCalendarId?: string) => {
+  const listed = await calendar.listCalendars();
+  if (!listed.ok) return listed;
+  const calendarId = requestedCalendarId ?? currentSettings.destinationCalendarId ?? "primary";
+  const destination =
+    listed.value.find((entry) => entry.id === calendarId) ??
+    (calendarId === "primary" ? listed.value.find((entry) => entry.primary) : undefined);
+  if (!destination || !isWritableCalendar(destination.accessRole)) {
+    return err({
+      code: "CALENDAR_READ_ONLY",
+      message: destination?.summary
+        ? `The selected calendar (${destination.summary}) is not writable. Open Settings and choose a calendar where you have writer or owner access.`
+        : "The selected calendar is not writable or is no longer available. Open Settings and choose a calendar where you have writer or owner access."
+    });
+  }
+  return ok({ calendarId, destination });
+};
+
+const recurringEventInput = async (
+  item: ReadingItem,
+  currentSettings: Settings,
+  calendarId: string
+): Promise<CreateCalendarEventInput> => {
+  if (!item.recurrence) throw new Error("A recurrence schedule is required.");
+  const eventId =
+    item.recurrence.calendarEventId ?? (await deterministicEventId(item.id, "readslot:recurrence"));
+  const start = new Date(
+    getNextOccurrenceInTimeZone(
+      item.recurrence.time,
+      item.recurrence.daysOfWeek,
+      currentSettings.timezone
+    )
+  );
+  const duration = item.plannedMinutes ?? item.estimatedMinutes;
+  return {
+    eventId,
+    calendarId,
+    title: `ReadSlot — ${item.title}`,
+    description: `Daily reading block for ${item.originalUrl}`,
+    start: start.toISOString(),
+    end: new Date(start.getTime() + duration * 60_000).toISOString(),
+    timezone: currentSettings.timezone,
+    transparency: "opaque",
+    reminderMinutes: currentSettings.defaultReminderMinutes,
+    recurrence: buildRRule(item.recurrence.daysOfWeek),
+    privateProperties: { readslotItemId: item.id, recurring: "true" }
+  };
+};
+
+const syncRecurringCalendarEvent = async (item: ReadingItem): Promise<Result<ReadingItem>> => {
+  if (!item.recurrence?.enabled || !item.recurrence.addToCalendar) return ok(item);
+  const settingsResult = await settings.get();
+  if (!settingsResult.ok) return settingsResult;
+
+  const operationId = `recurrence:${item.id}`;
+  const eventId =
+    item.recurrence.calendarEventId ?? (await deterministicEventId(item.id, "readslot:recurrence"));
+  const previousOperation = await operations.get(operationId);
+  if (!previousOperation.ok) return previousOperation;
+  const now = new Date().toISOString();
+  const pending = CalendarOperationSchema.parse({
+    schemaVersion: SCHEMA_VERSION,
+    id: operationId,
+    operationKind: "recurrence",
+    itemId: item.id,
+    deterministicEventId: eventId,
+    state: "pending",
+    createdAt: previousOperation.value?.createdAt ?? now,
+    updatedAt: now
+  });
+  const storedOperation = await operations.put(pending);
+  if (!storedOperation.ok) return storedOperation;
+
+  const fail = async (error: DomainError): Promise<Result<never>> => {
+    await operations.put({
+      ...pending,
+      state: "failed",
+      safeErrorCode: error.code,
+      updatedAt: new Date().toISOString()
+    });
+    return err(error);
+  };
+
+  const connected = await calendar.connect(false);
+  if (!connected.ok) return fail(connected.error);
+  const requestedCalendarId =
+    item.recurrence.calendarId ?? settingsResult.value.destinationCalendarId ?? "primary";
+  const destinationResult = await destinationCalendar(settingsResult.value, requestedCalendarId);
+  if (!destinationResult.ok) return fail(destinationResult.error);
+  const calendarId = destinationResult.value.calendarId;
+  const input = await recurringEventInput(item, settingsResult.value, calendarId);
+
+  let syncedEvent: { id: string; start: string; end: string } | undefined;
+  if (item.recurrence.calendarEventId) {
+    const updated = await calendar.updateEvent(input);
+    if (updated.ok) syncedEvent = updated.value;
+    else if (updated.error.code !== "CALENDAR_EVENT_NOT_FOUND") return fail(updated.error);
+  }
+
+  if (!syncedEvent) {
+    const existing = await calendar.getEvent(calendarId, input.eventId);
+    if (!existing.ok) return fail(existing.error);
+    syncedEvent = existing.value;
+  }
+  if (!syncedEvent) {
+    const created = await calendar.createEvent(input);
+    if (created.ok) syncedEvent = created.value;
+    else {
+      const reconciled = await calendar.getEvent(calendarId, input.eventId);
+      if (!reconciled.ok || !reconciled.value) return fail(created.error);
+      syncedEvent = reconciled.value;
+    }
+  }
+
+  const updatedItem = await items.update(item.id, {
+    recurrence: {
+      ...item.recurrence,
+      calendarEventId: syncedEvent.id,
+      calendarId
+    }
+  });
+  if (!updatedItem.ok) return updatedItem;
+  await operations.put({
+    ...pending,
+    state: "confirmed",
+    eventId: syncedEvent.id,
+    updatedAt: new Date().toISOString()
+  });
+  return updatedItem;
+};
+
+const removeRecurringCalendarEvent = async (item: ReadingItem): Promise<Result<void>> => {
+  const recurrence = item.recurrence;
+  if (!recurrence?.calendarEventId || !calendar.deleteEvent) return ok(undefined);
+  const settingsResult = await settings.get();
+  if (!settingsResult.ok) return settingsResult;
+  const calendarId =
+    recurrence.calendarId ?? settingsResult.value.destinationCalendarId ?? "primary";
+  const removed = await calendar.deleteEvent(calendarId, recurrence.calendarEventId);
+  if (!removed.ok && removed.error.code !== "CALENDAR_EVENT_NOT_FOUND") return removed;
+  return ok(undefined);
 };
 
 const overlap = (proposal: Proposal, busy: Array<{ start: string; end: string }>): boolean => {
@@ -288,8 +441,38 @@ export const handleMessage = async (input: unknown): Promise<Result<unknown>> =>
     switch (message.type) {
       case "capture.preview":
         return capture.previewCurrentTab();
-      case "capture.current":
-        return capture.fromCurrentTab(message.payload.recurrence);
+      case "capture.current": {
+        const captured = await capture.fromCurrentTab(message.payload.recurrence);
+        if (!captured.ok) return captured;
+        let calendarSync: CaptureCalendarSync = { status: "not_requested" };
+        let item = captured.value.item;
+        if (message.payload.recurrence?.addToCalendar) {
+          const synced = await syncRecurringCalendarEvent(item);
+          if (synced.ok) {
+            item = synced.value;
+            calendarSync = {
+              status: "synced",
+              calendarId: synced.value.recurrence?.calendarId ?? "primary",
+              eventId: synced.value.recurrence?.calendarEventId ?? ""
+            };
+          } else calendarSync = { status: "failed", error: synced.error };
+        } else if (message.payload.recurrence && item.recurrence?.calendarEventId) {
+          const removed = await removeRecurringCalendarEvent(item);
+          if (!removed.ok) calendarSync = { status: "failed", error: removed.error };
+          else {
+            const withoutCalendar = await items.update(item.id, {
+              recurrence: {
+                ...item.recurrence,
+                calendarEventId: undefined,
+                calendarId: undefined
+              }
+            });
+            if (withoutCalendar.ok) item = withoutCalendar.value;
+            else calendarSync = { status: "failed", error: withoutCalendar.error };
+          }
+        }
+        return ok({ ...captured.value, item, calendarSync });
+      }
       case "capture.url":
         return capture.fromUrl(
           message.payload.url,
@@ -299,8 +482,14 @@ export const handleMessage = async (input: unknown): Promise<Result<unknown>> =>
           undefined,
           message.payload.recurrence
         );
-      case "capture.undo":
+      case "capture.undo": {
+        const existing = await items.get(message.payload.itemId);
+        if (!existing.ok) return existing;
+        const removedEvent = await removeRecurringCalendarEvent(existing.value);
+        if (!removedEvent.ok) return removedEvent;
+        await clearItemAlarm(message.payload.itemId);
         return items.remove(message.payload.itemId);
+      }
       case "items.list":
         return items.list(message.payload);
       case "items.update": {
@@ -308,72 +497,30 @@ export const handleMessage = async (input: unknown): Promise<Result<unknown>> =>
         if (result.ok) {
           await scheduleItemAlarm(result.value);
           const item = result.value;
-          if (
-            item.recurrence?.enabled &&
-            item.recurrence.addToCalendar &&
-            !item.recurrence.calendarEventId
-          ) {
-            const settingsResult = await settings.get();
-            if (settingsResult.ok && settingsResult.value.destinationCalendarId) {
-              const calendarId = settingsResult.value.destinationCalendarId;
-              const [hours, minutes] = item.recurrence.time.split(":").map(Number);
-              const startObj = new Date();
-              startObj.setHours(hours, minutes, 0, 0);
-              const duration = item.plannedMinutes ?? item.estimatedMinutes ?? 30;
-              const endObj = new Date(startObj.getTime() + duration * 60 * 1000);
-              const created = await calendar.createEvent({
-                eventId: `rs${item.id.slice(0, 16)}${Date.now().toString(36)}`
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]/g, ""),
-                calendarId,
-                title: `ReadSlot — ${item.title}`,
-                description: `Daily reading block for ${item.originalUrl}`,
-                start: startObj.toISOString(),
-                end: endObj.toISOString(),
-                timezone: settingsResult.value.timezone,
-                transparency: "opaque",
-                reminderMinutes: settingsResult.value.defaultReminderMinutes,
-                recurrence: buildRRule(item.recurrence.daysOfWeek),
-                privateProperties: { readslotItemId: item.id, recurring: "true" }
-              });
-              if (created.ok) {
-                const withCal = await items.update(item.id, {
-                  recurrence: { ...item.recurrence, calendarEventId: created.value.id }
-                });
-                if (withCal.ok) return withCal;
-              }
-            }
+          if (item.recurrence?.enabled && item.recurrence.addToCalendar) {
+            return syncRecurringCalendarEvent(item);
           } else if (
             item.recurrence?.calendarEventId &&
             (!item.recurrence.enabled || !item.recurrence.addToCalendar)
           ) {
-            if (calendar.deleteEvent) {
-              const settingsResult = await settings.get();
-              if (settingsResult.ok && settingsResult.value.destinationCalendarId) {
-                await calendar.deleteEvent(
-                  settingsResult.value.destinationCalendarId,
-                  item.recurrence.calendarEventId
-                );
-                const withoutCal = await items.update(item.id, {
-                  recurrence: { ...item.recurrence, calendarEventId: undefined }
-                });
-                if (withoutCal.ok) return withoutCal;
+            const removed = await removeRecurringCalendarEvent(item);
+            if (!removed.ok) return removed;
+            return items.update(item.id, {
+              recurrence: {
+                ...item.recurrence,
+                calendarEventId: undefined,
+                calendarId: undefined
               }
-            }
+            });
           }
         }
         return result;
       }
       case "items.remove": {
         const existing = await items.get(message.payload.id);
-        if (existing.ok && existing.value.recurrence?.calendarEventId && calendar.deleteEvent) {
-          const settingsResult = await settings.get();
-          if (settingsResult.ok && settingsResult.value.destinationCalendarId) {
-            await calendar.deleteEvent(
-              settingsResult.value.destinationCalendarId,
-              existing.value.recurrence.calendarEventId
-            );
-          }
+        if (existing.ok) {
+          const removedEvent = await removeRecurringCalendarEvent(existing.value);
+          if (!removedEvent.ok) return removedEvent;
         }
         const result = await items.remove(message.payload.id, message.payload.permanent);
         if (result.ok) {

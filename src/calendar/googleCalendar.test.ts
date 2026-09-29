@@ -38,6 +38,25 @@ describe("GoogleCalendarGateway", () => {
     });
   });
 
+  it("preserves a safe Chrome Identity failure reason", async () => {
+    const mockedChrome = chromeMock();
+    vi.mocked(mockedChrome.identity.getAuthToken).mockRejectedValue(
+      new Error("OAuth2 request failed: invalid client id")
+    );
+    vi.stubGlobal("chrome", mockedChrome);
+
+    const result = await new GoogleCalendarGateway().connect(true);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("OAUTH_DENIED");
+      expect(result.error.message).toContain("invalid client id");
+      expect(result.error.context).toEqual({
+        identityMessage: "OAuth2 request failed: invalid client id"
+      });
+    }
+  });
+
   it("normalizes a successful FreeBusy response", async () => {
     vi.stubGlobal(
       "fetch",
@@ -301,5 +320,37 @@ describe("GoogleCalendarGateway", () => {
       id: "readslotrec01",
       recurrence: ["RRULE:FREQ=DAILY"]
     });
+  });
+
+  it("patches recurring events without trying to change their Google event ID", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            id: "readslotrec01",
+            start: { dateTime: "2026-07-15T20:00:00.000Z" },
+            end: { dateTime: "2026-07-15T20:30:00.000Z" }
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new GoogleCalendarGateway().updateEvent({
+      eventId: "readslotrec01",
+      calendarId: "primary",
+      title: "ReadSlot — Daily Newspaper",
+      description: "Daily reading block",
+      start: "2026-07-15T20:00:00.000Z",
+      end: "2026-07-15T20:30:00.000Z",
+      timezone: "Asia/Dhaka",
+      transparency: "opaque",
+      recurrence: ["RRULE:FREQ=DAILY"],
+      privateProperties: { readslotItemId: "item-newspaper" }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("PATCH");
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).not.toHaveProperty("id");
   });
 });

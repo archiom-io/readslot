@@ -1,3 +1,5 @@
+import { addDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { DailyHabitReminder, ReadingItem } from "../domain/schemas";
 import type { ReadingRepository, SettingsRepository } from "../domain/ports";
 
@@ -41,6 +43,27 @@ export const getNextOccurrence = (
     0
   );
   return fallback.getTime();
+};
+
+export const getNextOccurrenceInTimeZone = (
+  timeString: string,
+  daysOfWeek: number[] = [0, 1, 2, 3, 4, 5, 6],
+  timezone: string,
+  now = new Date()
+): number => {
+  const allowedDays = new Set(daysOfWeek.length > 0 ? daysOfWeek : [0, 1, 2, 3, 4, 5, 6]);
+  const localStartDate = formatInTimeZone(now, timezone, "yyyy-MM-dd");
+  for (let offset = 0; offset <= 7; offset += 1) {
+    const date = addDays(new Date(`${localStartDate}T12:00:00.000Z`), offset)
+      .toISOString()
+      .slice(0, 10);
+    const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+    if (!allowedDays.has(weekday)) continue;
+    const candidate = fromZonedTime(`${date}T${timeString}:00`, timezone);
+    if (candidate.getTime() > now.getTime()) return candidate.getTime();
+  }
+
+  return fromZonedTime(`${localStartDate}T${timeString}:00`, timezone).getTime();
 };
 
 /**

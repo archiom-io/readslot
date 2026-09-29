@@ -394,7 +394,8 @@ The user can save:
 
 ## Capture entry points
 
-- Toolbar popup with explicit Save for later and Save & choose time actions
+- Toolbar popup with explicit Save for later and Save & choose time actions for one-time planning,
+  plus dynamic Save daily reminder or Confirm & sync daily actions when recurrence is selected
 - Context menu with immediate capture
 - Keyboard shortcut with immediate capture
 - Queue page paste input
@@ -415,7 +416,8 @@ and keyboard captures:
 
 - Capture completes in under 300 ms locally, excluding metadata enrichment.
 - Duplicate detection works with normalized URLs.
-- Saving never triggers event creation.
+- Save for later never triggers event creation; Confirm & sync daily may create one deterministic
+  recurring event after the user explicitly selects Calendar sync.
 - Opening the toolbar popup never saves until the user chooses an action.
 - Save works while the user is offline.
 - Metadata enrichment failure does not prevent saving.
@@ -708,6 +710,10 @@ Defaults:
 
 Daily recurring reminders:
 - Item-specific recurrence schedule (time of day, days of week, optional Google Calendar sync)
+- Calendar-first but optional behavior: connection is required for Calendar sync, while local capture
+  and local reminders continue to work offline
+- Popup actions change after recurrence selection so a fixed daily time is not confused with the
+  one-time availability planner
 - Settings-level daily habit reminders (multiple customizable alerts with custom labels and active days)
 - Local Chrome desktop notifications with source link navigation on click
 - Recurring items remain queued upon session completion to stay active for future days
@@ -1198,6 +1204,9 @@ Responsibilities:
 - Show duplicate and current item status
 - Save for later only after an explicit action
 - Save and open item-scoped suggestions in the full planner
+- Connect Google Calendar directly without leaving the popup and surface OAuth failures inline
+- Save a fixed daily local reminder, or explicitly confirm deterministic recurring Calendar sync
+- Validate that the destination calendar is writable before recurring event creation
 - Open the queue and offer Undo for a new save
 
 ### Queue page

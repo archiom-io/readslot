@@ -18,7 +18,9 @@ const calendarMocks = vi.hoisted(() => ({
   listCalendars: vi.fn(async (): Promise<Result<CalendarSummary[]>> => ok([])),
   getBusy: vi.fn(async () => ok([])),
   getEvent: vi.fn(),
-  createEvent: vi.fn()
+  createEvent: vi.fn(),
+  updateEvent: vi.fn(),
+  deleteEvent: vi.fn()
 }));
 
 vi.mock("../calendar/googleCalendar", () => ({
@@ -30,6 +32,8 @@ vi.mock("../calendar/googleCalendar", () => ({
     getBusy = calendarMocks.getBusy;
     getEvent = calendarMocks.getEvent;
     createEvent = calendarMocks.createEvent;
+    updateEvent = calendarMocks.updateEvent;
+    deleteEvent = calendarMocks.deleteEvent;
   }
 }));
 
@@ -128,8 +132,23 @@ beforeEach(async () => {
       create: vi.fn(async () => undefined),
       clear: vi.fn(async () => undefined)
     },
+    tabs: {
+      query: vi.fn(async () => [
+        {
+          id: 7,
+          url: "https://example.com/daily",
+          title: "Daily article"
+        }
+      ]),
+      sendMessage: vi.fn(async () => ({ title: "Daily article", wordCount: 1200 }))
+    },
+    scripting: { executeScript: vi.fn(async () => undefined) },
     runtime: { getManifest: vi.fn(() => ({ version: "0.10.0" })) }
   });
+  calendarMocks.getEvent.mockResolvedValue(ok(undefined));
+  calendarMocks.createEvent.mockResolvedValue(ok(event));
+  calendarMocks.updateEvent.mockResolvedValue(ok(event));
+  calendarMocks.deleteEvent.mockResolvedValue(ok(undefined));
   calendarMocks.getBusy.mockResolvedValue(ok([]));
   calendarMocks.listCalendars.mockResolvedValue(
     ok([
@@ -232,6 +251,131 @@ describe("proposal confirmation recovery", () => {
     }
     expect(calendarMocks.createEvent).not.toHaveBeenCalled();
     expect(await database.calendarOperations.get("proposal-one")).toBeUndefined();
+  });
+});
+
+describe("daily Calendar sync", () => {
+  it("captures and idempotently syncs a recurring item to the primary calendar", async () => {
+    const result = await handleMessage({
+      type: "capture.current",
+      payload: {
+        recurrence: {
+          enabled: true,
+          time: "20:00",
+          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+          addToCalendar: true
+        }
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const value = result.value as {
+      item: ReadingItem;
+      duplicate: boolean;
+      calendarSync: { status: string; eventId?: string };
+    };
+    expect(value.calendarSync.status).toBe("synced");
+    expect(value.item.recurrence?.calendarEventId).toBe(event.id);
+    expect(value.item.recurrence?.calendarId).toBe("primary");
+    expect(calendarMocks.createEvent).toHaveBeenCalledTimes(1);
+    expect(calendarMocks.createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        calendarId: "primary",
+        recurrence: ["RRULE:FREQ=DAILY"],
+        privateProperties: { readslotItemId: value.item.id, recurring: "true" }
+      })
+    );
+    const operation = await database.calendarOperations.get(`recurrence:${value.item.id}`);
+    expect(operation?.operationKind).toBe("recurrence");
+    expect(operation?.state).toBe("confirmed");
+  });
+
+  it("updates the deterministic recurring event instead of creating a duplicate", async () => {
+    const message = {
+      type: "capture.current" as const,
+      payload: {
+        recurrence: {
+          enabled: true,
+          time: "20:00",
+          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+          addToCalendar: true
+        }
+      }
+    };
+
+    expect((await handleMessage(message)).ok).toBe(true);
+    const repeated = await handleMessage(message);
+
+    expect(repeated.ok).toBe(true);
+    expect(calendarMocks.createEvent).toHaveBeenCalledTimes(1);
+    expect(calendarMocks.updateEvent).toHaveBeenCalledTimes(1);
+    if (repeated.ok) {
+      expect((repeated.value as { duplicate: boolean }).duplicate).toBe(true);
+    }
+  });
+
+  it("reports a Calendar failure without losing the local reminder", async () => {
+    calendarMocks.listCalendars.mockResolvedValueOnce(
+      ok([
+        {
+          id: "primary",
+          summary: "Read-only calendar",
+          primary: true,
+          accessRole: "reader"
+        }
+      ])
+    );
+
+    const result = await handleMessage({
+      type: "capture.current",
+      payload: {
+        recurrence: {
+          enabled: true,
+          time: "20:00",
+          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+          addToCalendar: true
+        }
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const value = result.value as {
+      item: ReadingItem;
+      calendarSync: { status: string; error?: { code: string } };
+    };
+    expect(value.calendarSync).toMatchObject({
+      status: "failed",
+      error: { code: "CALENDAR_READ_ONLY" }
+    });
+    expect(value.item.recurrence?.enabled).toBe(true);
+    expect(await database.items.get(value.item.id)).toBeDefined();
+    expect(calendarMocks.createEvent).not.toHaveBeenCalled();
+  });
+
+  it("removes the recurring event and alarm when a new capture is undone", async () => {
+    const captured = await handleMessage({
+      type: "capture.current",
+      payload: {
+        recurrence: {
+          enabled: true,
+          time: "20:00",
+          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+          addToCalendar: true
+        }
+      }
+    });
+    expect(captured.ok).toBe(true);
+    if (!captured.ok) return;
+    const itemId = (captured.value as { item: ReadingItem }).item.id;
+
+    const undone = await handleMessage({ type: "capture.undo", payload: { itemId } });
+
+    expect(undone.ok).toBe(true);
+    expect(calendarMocks.deleteEvent).toHaveBeenCalledWith("primary", event.id);
+    expect(chrome.alarms.clear).toHaveBeenCalledWith(`reminder:item:${itemId}`);
+    expect((await database.items.get(itemId))?.status).toBe("deleted");
   });
 });
 

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ok } from "../domain/result";
+import { err, ok } from "../domain/result";
 import { sendMessage } from "./client";
 import { PageShell } from "./ui";
 
@@ -66,5 +66,26 @@ describe("PageShell navbar Google Calendar CTA", () => {
     await user.click(ctaButton);
 
     expect(sendMessage).toHaveBeenCalledWith({ type: "calendar.connect", payload: {} });
+  });
+
+  it("shows OAuth failures in place instead of silently redirecting", async () => {
+    const user = userEvent.setup();
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce(ok({ configured: true, connected: false }))
+      .mockResolvedValueOnce(
+        err({ code: "OAUTH_DENIED", message: "Google sign-in was cancelled or denied." })
+      );
+
+    render(
+      <PageShell eyebrow="Queue" title="Local Queue">
+        <div>Queue content</div>
+      </PageShell>
+    );
+
+    await user.click(await screen.findByRole("button", { name: /connect google calendar/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Google sign-in was cancelled or denied."
+    );
   });
 });

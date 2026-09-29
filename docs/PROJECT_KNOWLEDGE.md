@@ -110,7 +110,8 @@ Primary components:
 - **Background service worker:** message routing, storage orchestration, OAuth, Calendar API calls, proposal generation, alarms, migrations, and idempotent event creation.
 - **Content script:** safe metadata/readable-text extraction, content detection, selected-text capture, and save feedback.
 - **Popup:** non-persisting current-page preview, explicit save-for-later, duplicate status, Undo,
-  queue navigation, item-scoped planner handoff, and quick reading windows setup shortcut.
+  queue navigation, item-scoped planner handoff, direct Google Calendar connection, dynamic daily
+  reminder actions, and a quick reading windows setup shortcut.
 - **Queue page:** quick URL capture, Reading windows setup CTA, Daily Habits filter tab with count badges, zero-flicker tab switching, multi-criteria sorting, search aligned horizontally with sort filter, normalized card heights, ergonomic card actions (Read, Schedule, Done for today/Complete, More menu), bulk actions, decoupled data management (import/export), and reading statistics.
 - **Planner page:** candidate review, duration preset chips (10m..60m) and custom minute entry on proposal cards, Reading windows setup CTAs in header and empty state, conflict checks, and explicit confirmation.
 - **Session page:** item opening, timer, completion, and end-of-session review.
@@ -163,14 +164,20 @@ queued -> proposed -> scheduled -> in_progress -> completed
 
 Important rules:
 
-- Opening the toolbar popup never writes to the queue. Toolbar capture requires an explicit Save
-  for later or Save & choose time action; context-menu and keyboard capture remain immediate.
+- Opening the toolbar popup never writes to the queue. Toolbar capture requires an explicit action;
+  context-menu and keyboard capture remain immediate.
+- Google Calendar is required for availability-aware scheduling and Calendar sync, but remains
+  optional for local capture, queue management, and local daily reminders.
+- Selecting a daily reminder replaces the one-time planner actions. Local reminders use Save daily
+  reminder; Calendar-backed recurrence uses Confirm & sync daily after connection and writable
+  destination validation.
 - An item can belong to only one active confirmed session.
 - Completing a recurring item preserves its `queued` status so it remains active for subsequent
   scheduled daily reminders while recording session completion history.
 - A proposal expires after 24 hours by default and must be revalidated if stale.
 - Deletion is soft first; trash retention defaults to 30 days.
-- Deleting an item does not silently delete its Calendar event.
+- Deleting or undoing an item-specific recurring reminder also removes its linked recurring Calendar
+  event; deleting a one-time scheduled item does not silently delete session history.
 - Unfinished session items can return to `queued`.
 - Store timestamps as ISO strings and use an IANA timezone in settings.
 

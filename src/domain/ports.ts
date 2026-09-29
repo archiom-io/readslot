@@ -94,5 +94,8 @@ export interface CalendarGateway {
   createEvent(
     input: CreateCalendarEventInput
   ): Promise<Result<{ id: string; start: string; end: string }>>;
+  updateEvent(
+    input: CreateCalendarEventInput
+  ): Promise<Result<{ id: string; start: string; end: string }>>;
   deleteEvent?(calendarId: string, eventId: string): Promise<Result<void>>;
 }

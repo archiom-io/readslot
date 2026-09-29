@@ -35,7 +35,7 @@ Furthermore, the planner proposal editor offered only a hardcoded select dropdow
    - Falls back gracefully to `earliestStart`/`latestEnd` if no multi-windows are configured.
 
 4. **Cross-Surface Setup Shortcuts**:
-   - Added `[ ⚙️ Reading windows ]` setup CTA buttons across the Planner header action bar, Planner empty states, Queue header action bar, and Popup footer.
+   - Added Reading windows setup CTA buttons with a settings icon across the Planner header action bar, Planner empty states, Queue header action bar, and Popup footer.
    - Implemented deep-link auto-scrolling to `#reading-windows` on the Settings page.
 
 5. **Queue UI & Visual Ergonomics**:

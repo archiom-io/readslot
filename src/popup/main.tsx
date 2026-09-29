@@ -1,15 +1,39 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { CapturePreview, ItemStatus, ReadingItem } from "../domain/schemas";
+import { isWritableCalendar } from "../domain/calendar";
+import type { CalendarSummary } from "../domain/ports";
+import type { DomainError } from "../domain/result";
+import type { CapturePreview, ItemStatus, ReadingItem, Settings } from "../domain/schemas";
 import { sendMessage } from "../shared/client";
+import { Icon } from "../shared/icons";
 import { Notice, formatMinutes } from "../shared/ui";
 
-type NoticeState = { tone: "info" | "success" | "danger"; text: string };
+type NoticeState = { tone: "info" | "success" | "warning" | "danger"; text: string };
+
+interface CalendarStatus {
+  configured: boolean;
+  connected: boolean;
+  error?: DomainError;
+}
+
+type CaptureCalendarSync =
+  | { status: "not_requested" }
+  | { status: "synced"; calendarId: string; eventId: string }
+  | { status: "failed"; error: DomainError };
+
+interface CaptureResponse {
+  item: ReadingItem;
+  duplicate: boolean;
+  calendarSync?: CaptureCalendarSync;
+}
 
 const blockedScheduleStatuses: ItemStatus[] = ["scheduled", "in_progress", "completed", "archived"];
 
 const statusLabel = (status?: ItemStatus): string =>
   status ? status.replaceAll("_", " ") : "saved";
+
+const dailyActionLabel = (duplicate: boolean): string =>
+  duplicate ? "Update daily reminder" : "Save daily reminder";
 
 export const PopupApp = () => {
   const [preview, setPreview] = useState<CapturePreview>();
@@ -20,6 +44,12 @@ export const PopupApp = () => {
   const [dailyReminder, setDailyReminder] = useState(false);
   const [reminderTime, setReminderTime] = useState("20:00");
   const [addToCalendar, setAddToCalendar] = useState(false);
+  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>();
+  const [calendarName, setCalendarName] = useState<string>();
+  const [calendarWritable, setCalendarWritable] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(true);
+  const [calendarBusy, setCalendarBusy] = useState(false);
+  const [calendarNotice, setCalendarNotice] = useState<NoticeState>();
 
   const loadPreview = async () => {
     setLoading(true);
@@ -29,9 +59,72 @@ export const PopupApp = () => {
     setLoading(false);
   };
 
+  const loadCalendar = async (): Promise<boolean> => {
+    setCalendarLoading(true);
+    const statusResult = await sendMessage<CalendarStatus>({
+      type: "calendar.status",
+      payload: {}
+    });
+    if (!statusResult.ok) {
+      setCalendarNotice({ tone: "danger", text: statusResult.error.message });
+      setCalendarLoading(false);
+      return false;
+    }
+    setCalendarStatus(statusResult.value);
+    setCalendarWritable(false);
+    setCalendarName(undefined);
+    if (!statusResult.value.connected) {
+      setCalendarLoading(false);
+      return true;
+    }
+
+    const [settingsResult, calendarsResult] = await Promise.all([
+      sendMessage<Settings>({ type: "settings.get", payload: {} }),
+      sendMessage<CalendarSummary[]>({ type: "calendar.list", payload: {} })
+    ]);
+    if (!settingsResult.ok) {
+      setCalendarNotice({ tone: "danger", text: settingsResult.error.message });
+      setCalendarLoading(false);
+      return false;
+    }
+    if (!calendarsResult.ok) {
+      setCalendarNotice({ tone: "danger", text: calendarsResult.error.message });
+      setCalendarLoading(false);
+      return false;
+    }
+    const selectedId = settingsResult.value.destinationCalendarId ?? "primary";
+    const selected =
+      calendarsResult.value.find((calendar) => calendar.id === selectedId) ??
+      (selectedId === "primary"
+        ? calendarsResult.value.find((calendar) => calendar.primary)
+        : undefined);
+    setCalendarName(selected?.summary);
+    setCalendarWritable(Boolean(selected && isWritableCalendar(selected.accessRole)));
+    setCalendarLoading(false);
+    return true;
+  };
+
   useEffect(() => {
     void loadPreview();
+    void loadCalendar();
   }, []);
+
+  const connectCalendar = async (): Promise<void> => {
+    setCalendarBusy(true);
+    setCalendarNotice(undefined);
+    const result = await sendMessage<{ connected: boolean }>({
+      type: "calendar.connect",
+      payload: {}
+    });
+    if (!result.ok) {
+      setCalendarNotice({ tone: "danger", text: result.error.message });
+      setCalendarBusy(false);
+      return;
+    }
+    const loaded = await loadCalendar();
+    if (loaded) setCalendarNotice({ tone: "success", text: "Google Calendar connected." });
+    setCalendarBusy(false);
+  };
 
   const openPage = async (
     page: "queue.html" | "planner.html" | "session.html" | "options.html",
@@ -45,17 +138,19 @@ export const PopupApp = () => {
     else setNotice({ tone: "danger", text: result.error.message });
   };
 
-  const capture = async (): Promise<ReadingItem | undefined> => {
+  const capture = async (
+    calendarSyncRequested = addToCalendar
+  ): Promise<ReadingItem | undefined> => {
     setBusy(true);
     const recurrence = dailyReminder
       ? {
           enabled: true,
           time: reminderTime,
           daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-          addToCalendar
+          addToCalendar: calendarSyncRequested
         }
       : undefined;
-    const result = await sendMessage<{ item: ReadingItem; duplicate: boolean }>({
+    const result = await sendMessage<CaptureResponse>({
       type: "capture.current",
       payload: recurrence ? { recurrence } : {}
     });
@@ -65,6 +160,7 @@ export const PopupApp = () => {
       return undefined;
     }
     const { item, duplicate } = result.value;
+    const calendarSync = result.value.calendarSync;
     setPreview((current) =>
       current
         ? {
@@ -76,19 +172,32 @@ export const PopupApp = () => {
         : current
     );
     setUndoItemId(duplicate ? undefined : item.id);
-    setNotice({
-      tone: duplicate ? "info" : "success",
-      text: duplicate
-        ? "Already saved in ReadSlot."
-        : dailyReminder
-          ? `Saved with daily reminder at ${reminderTime}.`
-          : "Saved to ReadSlot."
-    });
+    if (calendarSync?.status === "failed") {
+      setNotice({
+        tone: "warning",
+        text: `Saved locally, but Calendar sync failed: ${calendarSync.error.message}`
+      });
+    } else {
+      setNotice({
+        tone: duplicate ? "info" : "success",
+        text: dailyReminder
+          ? calendarSync?.status === "synced"
+            ? `${duplicate ? "Updated" : "Saved"} and synced daily at ${reminderTime}.`
+            : `${duplicate ? "Updated" : "Saved"} daily reminder for ${reminderTime}.`
+          : duplicate
+            ? "Already saved in ReadSlot."
+            : "Saved to ReadSlot."
+      });
+    }
     return item;
   };
 
   const saveForLater = async () => {
     await capture();
+  };
+
+  const saveDailyLocally = async () => {
+    await capture(false);
   };
 
   const saveAndSchedule = async () => {
@@ -124,6 +233,7 @@ export const PopupApp = () => {
   const scheduleBlocked =
     preview?.duplicate && blockedScheduleStatuses.includes(preview.existingItemStatus ?? "queued");
   const alreadyActive = preview?.duplicate && preview.existingItemStatus !== "deleted";
+  const calendarReady = Boolean(calendarStatus?.connected && calendarWritable);
 
   return (
     <main className="popup-shell">
@@ -157,6 +267,47 @@ export const PopupApp = () => {
             </Notice>
           )}
           {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
+          {calendarNotice && <Notice tone={calendarNotice.tone}>{calendarNotice.text}</Notice>}
+
+          <div className="popup-calendar-status" aria-live="polite">
+            <div className="popup-calendar-copy">
+              <Icon name="calendar" size={18} />
+              <div>
+                <strong>Google Calendar</strong>
+                <span>
+                  {!calendarStatus || calendarLoading
+                    ? "Checking connection…"
+                    : !calendarStatus.configured
+                      ? "Unavailable in this build"
+                      : !calendarStatus.connected
+                        ? "Connect to schedule and sync"
+                        : calendarWritable
+                          ? `Connected${calendarName ? ` · ${calendarName}` : ""}`
+                          : "Choose a writable destination"}
+                </span>
+              </div>
+            </div>
+            {calendarStatus?.configured && !calendarStatus.connected && (
+              <button
+                type="button"
+                className="button button-secondary popup-calendar-button"
+                disabled={calendarBusy || busy}
+                onClick={() => void connectCalendar()}
+              >
+                {calendarBusy ? "Connecting…" : "Connect"}
+              </button>
+            )}
+            {calendarStatus?.connected && !calendarLoading && !calendarWritable && (
+              <button
+                type="button"
+                className="button button-secondary popup-calendar-button"
+                disabled={calendarBusy || busy}
+                onClick={() => void openPage("options.html")}
+              >
+                Choose
+              </button>
+            )}
+          </div>
 
           <div
             style={{
@@ -189,7 +340,10 @@ export const PopupApp = () => {
                   type="checkbox"
                   aria-label="Set daily reminder"
                   checked={dailyReminder}
-                  onChange={(e) => setDailyReminder(e.target.checked)}
+                  onChange={(e) => {
+                    setDailyReminder(e.target.checked);
+                    if (!e.target.checked) setAddToCalendar(false);
+                  }}
                 />
                 <span>Remind daily at</span>
               </label>
@@ -209,51 +363,114 @@ export const PopupApp = () => {
               />
             </div>
             {dailyReminder && (
-              <label
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginTop: 8,
-                  marginLeft: 24,
-                  fontSize: 12,
-                  color: "var(--muted)",
-                  cursor: "pointer"
-                }}
-              >
-                <input
-                  type="checkbox"
-                  aria-label="Sync with Google Calendar"
-                  checked={addToCalendar}
-                  onChange={(e) => setAddToCalendar(e.target.checked)}
-                />
-                <span>Sync with Google Calendar</span>
-              </label>
+              <>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginTop: 8,
+                    marginLeft: 24,
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    cursor: "pointer"
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label="Sync with Google Calendar"
+                    checked={addToCalendar}
+                    onChange={(e) => setAddToCalendar(e.target.checked)}
+                  />
+                  <span>Sync with Google Calendar</span>
+                </label>
+                <p className="popup-reminder-summary">
+                  Every day at {reminderTime} · About {formatMinutes(preview.estimatedMinutes)}
+                  {addToCalendar && calendarName ? ` · ${calendarName}` : ""}
+                </p>
+              </>
             )}
           </div>
 
           <div className="popup-actions">
-            <button
-              className="button button-secondary"
-              disabled={busy || Boolean(alreadyActive)}
-              onClick={() => void saveForLater()}
-            >
-              {busy
-                ? "Saving…"
-                : preview.existingItemStatus === "deleted"
-                  ? "Restore to queue"
-                  : alreadyActive
-                    ? "Already saved"
-                    : "Save for later"}
-            </button>
-            {!scheduleBlocked && (
-              <button
-                className="button button-primary"
-                disabled={busy}
-                onClick={() => void saveAndSchedule()}
-              >
-                Save & choose time
-              </button>
+            {dailyReminder ? (
+              !scheduleBlocked && (
+                <>
+                  {addToCalendar && calendarLoading ? (
+                    <button className="button button-primary" disabled>
+                      Checking Calendar…
+                    </button>
+                  ) : addToCalendar && calendarStatus?.configured && !calendarStatus.connected ? (
+                    <button
+                      className="button button-primary"
+                      disabled={busy || calendarBusy}
+                      onClick={() => void connectCalendar()}
+                    >
+                      {calendarBusy ? "Connecting…" : "Connect Google Calendar"}
+                    </button>
+                  ) : addToCalendar && calendarStatus?.connected && !calendarWritable ? (
+                    <button
+                      className="button button-primary"
+                      disabled={busy}
+                      onClick={() => void openPage("options.html")}
+                    >
+                      Choose a writable calendar
+                    </button>
+                  ) : (
+                    <button
+                      className="button button-primary"
+                      disabled={
+                        busy || (addToCalendar && (!calendarStatus?.configured || !calendarReady))
+                      }
+                      onClick={() => void capture()}
+                    >
+                      {busy
+                        ? "Saving…"
+                        : addToCalendar
+                          ? calendarStatus?.configured === false
+                            ? "Calendar unavailable"
+                            : "Confirm & sync daily"
+                          : preview.existingItemStatus === "deleted"
+                            ? "Restore with daily reminder"
+                            : dailyActionLabel(preview.duplicate)}
+                    </button>
+                  )}
+                  {addToCalendar && (
+                    <button
+                      className="button button-secondary"
+                      disabled={busy || calendarBusy}
+                      onClick={() => void saveDailyLocally()}
+                    >
+                      Save reminder locally
+                    </button>
+                  )}
+                </>
+              )
+            ) : (
+              <>
+                <button
+                  className="button button-secondary"
+                  disabled={busy || Boolean(alreadyActive)}
+                  onClick={() => void saveForLater()}
+                >
+                  {busy
+                    ? "Saving…"
+                    : preview.existingItemStatus === "deleted"
+                      ? "Restore to queue"
+                      : alreadyActive
+                        ? "Already saved"
+                        : "Save for later"}
+                </button>
+                {!scheduleBlocked && (
+                  <button
+                    className="button button-primary"
+                    disabled={busy}
+                    onClick={() => void saveAndSchedule()}
+                  >
+                    Save & choose time
+                  </button>
+                )}
+              </>
             )}
             {undoItemId && (
               <button className="button button-quiet" disabled={busy} onClick={() => void undo()}>
@@ -294,7 +511,8 @@ export const PopupApp = () => {
           onClick={() => void openPage("options.html")}
           title="Configure reading windows and settings"
         >
-          ⚙️ Windows
+          <Icon name="settings" size={14} />
+          Windows
         </button>
       </div>
     </main>
