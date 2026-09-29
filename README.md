@@ -33,6 +33,17 @@ configured from the ignored `.env.local` file during normal development builds; 
 supplied explicitly. The current development OAuth client is tied to the extension ID
 `lbmgjokmljcgnhalhkbdfmomifkcedmp`.
 
+### Moving development or user data to another device
+
+- Clone the repository, copy `.env.example` to the ignored `.env.local`, restore the OAuth client
+  from the Archiom Google Cloud project, and rebuild. Generated `dist/` and `release/` directories
+  are not stored in Git.
+- Before retiring an existing browser profile, open **Queue → Data & Backups → Export JSON backup**.
+  The backup contains the local queue, proposals, sessions, and settings and can be imported from
+  the same menu on the replacement device.
+- Follow the maintainer handoff in [`docs/PROJECT_KNOWLEDGE.md`](docs/PROJECT_KNOWLEDGE.md) before
+  preparing the next Chrome Web Store update.
+
 The maintained development baseline is in
 [`docs/PROJECT_KNOWLEDGE.md`](docs/PROJECT_KNOWLEDGE.md), with the complete product and delivery
 specification in

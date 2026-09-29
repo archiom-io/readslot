@@ -1,8 +1,8 @@
 # ReadSlot Project Knowledge
 
 **Purpose:** Living context for maintainers, contributors, and coding agents  
-**Last updated:** 2026-07-17
-**Current phase:** Version 0.10.0 release; real OAuth verification and final release packaging pending
+**Last updated:** 2026-09-29
+**Current phase:** Version 0.10.0 is published; `main` contains unreleased post-publication work for the next version
 
 ## 1. Project identity
 
@@ -16,7 +16,7 @@
 
 Use **ReadSlot** in product copy, UI labels, package metadata, documentation, OAuth configuration, and store listings. Use **Reading Block** only when referring to the upstream project or preserving its legal attribution.
 
-ReadSlot replaced the former working name on 2026-07-13 because it communicates the reading-plus-time-slot behavior directly and has fewer obvious software collisions in a preliminary search. Formal Chrome Web Store, GitHub, domain, and trademark clearance remains a publication gate.
+ReadSlot replaced the former working name on 2026-07-13 because it communicates the reading-plus-time-slot behavior directly and has fewer obvious software collisions in a preliminary search. ReadSlot is now the published Chrome Web Store identity maintained by Archiom. Future platform and trademark reviews remain a maintainer responsibility.
 
 ## 2. Product in one paragraph
 
@@ -35,9 +35,28 @@ the full product specification; this file records the implemented baseline.
 
 The clean TypeScript foundation is settled in ADR 0001. The upstream source was not imported
 wholesale. Daily recurring habit and item reminders are settled in ADR 0005. Multi-window reading
-schedules, duration presets, and UI ergonomics are settled in ADR 0006. The remaining external
-checkpoint is a Chrome Extension OAuth client ID for real Calendar verification; production
-packaging also requires the Store extension's OAuth client ID.
+schedules, duration presets, and UI ergonomics are settled in ADR 0006. Version 0.10.0 has been
+published to the Chrome Web Store. Google OAuth, the Calendar API, the Store listing, and the
+Archiom-hosted public pages remain external account state rather than repository state.
+
+### Maintainer handoff after 0.10.0
+
+- The root `CHANGELOG.md` records current post-publication work under **Unreleased**. Keep
+  `package.json` at `0.10.0` only until preparing the next release, then choose a version greater
+  than the version already published in the Chrome Web Store.
+- `.env.local`, `dist/`, and `release/` are intentionally ignored. A fresh clone must recreate
+  `.env.local` from `.env.example`, using the Chrome Extension OAuth client maintained in Google
+  Cloud, and regenerate all build/package artifacts.
+- Never assume a ZIP left in an ignored local `release/` directory represents current `main` or the
+  package uploaded to the Store. Generate a fresh package after the version bump, verify its
+  checksum and manifest, and archive the exact submitted ZIP plus checksum in approved release
+  storage.
+- ReadSlot queue data, proposals, sessions, and settings are device-local. Before retiring a browser
+  profile or computer, use **Queue → Data & Backups → Export JSON backup** and retain the download
+  securely for import on the replacement device.
+- Continuing maintainers need access to the `archiom-io/readslot` GitHub repository, the Archiom
+  Chrome Web Store developer account, the Google Cloud project holding the OAuth client and enabled
+  Calendar API, and hosting for `archiom.io/apps/readslot`.
 
 ## 4. Decision hierarchy
 
@@ -290,8 +309,10 @@ Resolved implementation choices:
 
 Still external or post-v1:
 
-- Development and production Chrome Extension OAuth client IDs
-- Chrome Web Store reserved extension ID, repository/support URL, and account-level submission
+- Google Cloud OAuth clients, Calendar API configuration, and consent-screen verification state
+- Chrome Web Store account access, listing state, reviews, and exact submitted packages
+- Archiom domain/DNS/hosting access for the public verification, privacy, terms, and support pages
+- Device-local user data unless the user explicitly exports a JSON backup
 - Broader Firefox/WebExtension compatibility
 
 Resolve decisions at the last responsible moment, record material ones in `docs/adr/`, and update this list.
